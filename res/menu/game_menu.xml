@@ -1,0 +1,6 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<group android:id="@+id/app_controls"><item android:id="@+id/menu_about" android:title="@string/about" android:icon="@android:drawable/ic_menu_info_details"></item><item android:icon="@android:drawable/ic_lock_silent_mode" android:id="@+id/menu_toggle_sound" android:title="@string/toggle_sound"></item><item android:title="@string/quit" android:id="@+id/quit" android:checkable="false" android:icon="@android:drawable/ic_menu_delete"></item>
+</group>
+<group android:id="@+id/game_controls"><item android:checkable="false" android:id="@+id/menu_0p" android:title="@string/no_players" android:icon="@android:drawable/ic_menu_add"></item><item android:checkable="false" android:id="@+id/menu_1p" android:title="@string/one_player" android:icon="@android:drawable/ic_menu_add"></item><item android:checkable="false" android:id="@+id/menu_2p" android:title="@string/two_players" android:icon="@android:drawable/ic_menu_add"></item></group>
+
+</menu>

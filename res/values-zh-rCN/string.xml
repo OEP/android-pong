@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pong</string>
+    <string name="by_line">由 Paul Kilgo 制作</string>
+    <string name="paused">暂 停</string>
+    
+    
+    <string name="one_player">单人模式</string>
+    <string name="two_players">双人模式</string>
+    <string name="no_players">无玩家</string>
+    <string name="about">关于</string>
+    <string name="about_pong">关于 Pong</string>
+    <string name="about_msg">Pong 来自 One-Eyed Parrot Games http://pk-fire.com/</string>
+    <string name="quit">退出</string>
+    
+    <string name="menu_prompt">按Menu键以开始</string>
+    
+    <string name="new_game">新游戏</string>
+    <string name="red_wins">红方获胜！</string>
+    <string name="blue_wins">蓝方获胜！</string>
+    
+    <string name="join_in">点击以加入游戏！</string>
+<string name="pause">暂停</string>
+<string name="toggle_sound">切换声音</string>
+
+<string name="sound_enabled">声音开启</string>
+<string name="sound_disabled">声音关闭</string>
+</resources>
