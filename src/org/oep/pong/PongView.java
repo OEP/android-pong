@@ -90,14 +90,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Amount to increment framerate each paddle hit */
 	private int mFrameSkips = 5;
 	
-	/** TODO: What is this */
+	/** Timestamp of the last frame created */
 	private long mLastFrame = 0;
 
 	/** Position of the ball */
 	private Point mBallPosition;
 	
-	/** Angle (in degrees) of the ball */
-	private int mBallAngle;
+	/** Angle (in radians) of the ball */
+	private double mBallAngle;
 	
 	/** The measured x-velocity of the ball */
 	private int mDX;
@@ -243,7 +243,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Shake it up if it appears to not be moving vertically
 		if(py == mBallPosition.getY()) {
-			mBallAngle = RNG.nextInt(360);
+			randomizeBall();
 		}
 		
 		// Do some basic paddle AI
@@ -377,7 +377,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
-		Random r = new Random(cpu.centerY() + mBallAngle + salt);
+		Random r = new Random(cpu.centerY() + mDX + mDY + salt);
 		x += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
 		movePaddleTorward(cpu, mPaddleSpeed, x);
 		
@@ -421,35 +421,33 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		
 		
-		int dA = 40 * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
-		if(mBallAngle > 180 && x < r.centerX() || mBallAngle < 180 && x > r.centerX()) {
-			mBallAngle = safeRotate(mBallAngle, -dA);
+		double range = 4 * Math.PI / 9;
+		double amt = range * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
+		if(mBallAngle > Math.PI && x < r.centerX() || mBallAngle < Math.PI && x > r.centerX()) {
+			mBallAngle = safeRotate(mBallAngle, -amt);
 		}
-		else if(mBallAngle > 180 && x > r.centerX() || mBallAngle < 180 && x < r.centerX()) {
-			mBallAngle = safeRotate(mBallAngle, dA);
+		else if(mBallAngle > Math.PI && x > r.centerX() || mBallAngle < Math.PI && x < r.centerX()) {
+			mBallAngle = safeRotate(mBallAngle, amt);
 		}
 	}
 	
 	/**
-	 * Rotate the ball without extending beyond bounds which would create a case
-	 * where VY = 0.
+	 * Rotate the ball's new angle within acceptable bounds.
+	 * Prevents the ball from having no y-velocity.
 	 * @param ballAngle
-	 * @param da
-	 * @return
+	 * @param amt The amount to rotate the angle
+	 * @return new ball angle
 	 */
-	private int safeRotate(int angle, int da) {
-		int dy, add;
-		while(da != 0) {
-			add = (da > 0) ? 1 : -1;
-			angle += add;
-			da -= add;
-			
-			dy = (int) (mBallSpeed * Math.sin(angle * Math.PI / 180));
-			if(dy == 0) {
-				return angle - add;
-			}
+	private double safeRotate(double angle, double amt) {
+		double tolerance = Math.PI / 8;
+		
+		if(angle < Math.PI) {
+			// Bound new angle in [tolerance, PI - tolerance]
+			return Math.max(tolerance, Math.max(angle + amt, Math.PI - tolerance));
 		}
-		return angle;
+		
+		// Otherwise, keep it in [PI + tolerance, 2*PI - tolerance
+		return Math.max(tolerance, Math.max(angle + amt, Math.PI - tolerance));
 	}
 
 	/**
@@ -478,7 +476,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Math failed me when figuring this out so I guessed instead.
 	 */
 	private void bounceBallVertical() {
-		mBallAngle = (540 - mBallAngle) % 360;
+		mBallAngle = (Math.PI - mBallAngle) % 2 * Math.PI;
 		playSound(mWallHit);
 	}
 
@@ -487,7 +485,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 */
 	private void bounceBallHorizontal() {
 		// Amazingly enough...
-		mBallAngle = (360 - mBallAngle) % 360;
+		mBallAngle = (Math.PI - mBallAngle) % 2 * Math.PI;
 		playSound(mPaddleHit);
 	}
 
@@ -570,8 +568,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      */
     private void resetBall() {
     	mBallPosition.set(getWidth() / 2, getHeight() / 2);
-    	mBallAngle = RNG.nextInt(360);
+    	randomizeBall();
     	mBallCounter = 60;
+    }
+    
+    protected void randomizeBall() {
+//    	mBallAngle = 2 * Math.PI * RNG.nextDouble();
+    	mBallAngle = Math.PI / 4;
     }
     
     /**
