@@ -16,6 +16,7 @@ import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -227,16 +228,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		int px = mBallPosition.getX();
 		int py = mBallPosition.getY();
 		
-		// Move the ball
-		if(mBallCounter == 0) {
-			mBallPosition.set(
-					normalizeBallX((int) (px + mBallSpeed * Math.cos(mBallAngle * Math.PI / 180.)) ), 
-					py + mBallSpeed * Math.sin(mBallAngle * Math.PI / 180.)
-					);
-		}
-		else {
-			mBallCounter = Math.max(0, mBallCounter - 1);
-		}
+		moveBall();
 		
 		mDX = mBallPosition.getX() - px;
 		mDY = mBallPosition.getY() - py;
@@ -273,6 +265,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			else playSound(mWinTone);
 		}
 		
+		handleBounces();
+	}
+	
+	protected void handleBounces() {
 		// Handle bouncing off of a wall
 		if(mBallPosition.getX() == BALL_RADIUS || mBallPosition.getX() == getWidth() - BALL_RADIUS) {
 			bounceBallVertical();
@@ -283,16 +279,31 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 		
 		// Bouncing off the paddles
-		if(mBallAngle >= 180 && ballCollides(mRedPaddleRect) ) {
+		if(mBallAngle >= Math.PI && ballCollides(mRedPaddleRect) ) {
 			bounceBallHorizontal();
 			normalizeBallCollision(mRedPaddleRect);
 			increaseDifficulty();
 		}
-		else if(mBallAngle < 180 && ballCollides(mBluePaddleRect)) {
+		else if(mBallAngle < Math.PI && ballCollides(mBluePaddleRect)) {
 			bounceBallHorizontal();
 			normalizeBallCollision(mBluePaddleRect);
 			increaseDifficulty();
 		}	
+	}
+	
+	protected void moveBall() {
+		int px = mBallPosition.x;
+		int py = mBallPosition.y;
+		
+		if(mBallCounter == 0) {
+			mBallPosition.set(
+					normalizeBallX((int) (px + mBallSpeed * Math.cos(mBallAngle)) ), 
+					py + mBallSpeed * Math.sin(mBallAngle)
+					);
+		}
+		else {
+			mBallCounter = Math.max(0, mBallCounter - 1);
+		}
 	}
 
 	/**
@@ -421,14 +432,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		
 		
-		double range = 4 * Math.PI / 9;
+		/*double range = 4 * Math.PI / 9;
 		double amt = range * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
 		if(mBallAngle > Math.PI && x < r.centerX() || mBallAngle < Math.PI && x > r.centerX()) {
 			mBallAngle = safeRotate(mBallAngle, -amt);
 		}
 		else if(mBallAngle > Math.PI && x > r.centerX() || mBallAngle < Math.PI && x < r.centerX()) {
 			mBallAngle = safeRotate(mBallAngle, amt);
-		}
+		}*/
 	}
 	
 	/**
@@ -476,7 +487,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Math failed me when figuring this out so I guessed instead.
 	 */
 	private void bounceBallVertical() {
-		mBallAngle = (Math.PI - mBallAngle) % 2 * Math.PI;
+		int n = (mBallAngle <= Math.PI) ? 1 : 3;
+		mBallAngle = (n * Math.PI - mBallAngle) % (2 * Math.PI);
 		playSound(mWallHit);
 	}
 
@@ -484,8 +496,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Bounce the ball off a horizontal axis.
 	 */
 	private void bounceBallHorizontal() {
-		// Amazingly enough...
-		mBallAngle = (Math.PI - mBallAngle) % 2 * Math.PI;
+		mBallAngle = (2 * Math.PI - mBallAngle) % (2 * Math.PI);
 		playSound(mPaddleHit);
 	}
 
@@ -573,8 +584,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     }
     
     protected void randomizeBall() {
-//    	mBallAngle = 2 * Math.PI * RNG.nextDouble();
-    	mBallAngle = Math.PI / 4;
+    	mBallAngle = 2 * Math.PI * RNG.nextDouble();
     }
     
     /**
