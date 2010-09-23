@@ -94,26 +94,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Timestamp of the last frame created */
 	private long mLastFrame = 0;
 
-	/** Position of the ball */
-	private Point mBallPosition;
-	
-	/** Angle (in radians) of the ball */
-	private double mBallAngle;
-	
-	/** The measured x-velocity of the ball */
-	private int mDX;
-	
-	/** The measured y-velocity of the ball */
-	private int mDY;
-	
-	/** Timer which holds the ball in place at start of round */
-	private int mBallCounter = 60;
-	
-	/** Speed of the ball */
-	private int mBallSpeed = 4;
-	
 	/** Speed of the paddles */
-	private int mPaddleSpeed = mBallSpeed - 2;
+	private int mPaddleSpeed = 2;
+	
+	protected Ball mBall = new Ball();
 
 	/** Random number generator */
 	private static final Random RNG = new Random();
@@ -121,9 +105,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Paint object */
 	private final Paint mPaint = new Paint();
 
-	/** Radius of the ball */
-	private static final int BALL_RADIUS = 4;
-	
 	/** Thickness of the paddle */
 	private static final int PADDLE_THICKNESS = 10;
 	
@@ -225,17 +206,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * Given some initial game state, it computes the next game state.
      */
 	private void doGameLogic() {
-		int px = mBallPosition.getX();
-		int py = mBallPosition.getY();
+		float px = mBall.x;
+		float py = mBall.y;
 		
-		moveBall();
-		
-		mDX = mBallPosition.getX() - px;
-		mDY = mBallPosition.getY() - py;
+		mBall.move();
 		
 		// Shake it up if it appears to not be moving vertically
-		if(py == mBallPosition.getY()) {
-			randomizeBall();
+		if(py == mBall.y) {
+			mBall.randomAngle();
 		}
 		
 		// Do some basic paddle AI
@@ -251,14 +229,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			movePaddleTorward(mBluePaddleRect, 8 * mPaddleSpeed, mBlueLastTouch);
 		
 		// See if all is lost
-		if(mBallPosition.getY() >= getHeight()) {
+		if(mBall.y >= getHeight()) {
 			mNewRound = true;
 			mBlueLives = Math.max(0, mBlueLives - 1);
 			
 			if(mBlueLives != 0 || mShowTitle) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
-		else if (mBallPosition.getY() <= 0) {
+		else if (mBall.y <= 0) {
 			mNewRound = true;
 			mRedLives = Math.max(0, mRedLives - 1);
 			if(mRedLives != 0 || mShowTitle) playSound(mMissTone);
@@ -270,42 +248,25 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	
 	protected void handleBounces() {
 		// Handle bouncing off of a wall
-		if(mBallPosition.getX() == BALL_RADIUS || mBallPosition.getX() == getWidth() - BALL_RADIUS) {
-			bounceBallVertical();
-			if(mBallPosition.getX() == BALL_RADIUS)
-				mBallPosition.translate(1, 0);
+		if(mBall.x <= Ball.RADIUS || mBall.x >= getWidth() - Ball.RADIUS) {
+			mBall.bounceWall();
+			if(mBall.x == Ball.RADIUS)
+				mBall.x++;
 			else
-				mBallPosition.translate(-1, 0);
+				mBall.x--;
 		}
 		
 		// Bouncing off the paddles
-		if(mBallAngle >= Math.PI && ballCollides(mRedPaddleRect) ) {
-			bounceBallHorizontal();
-			normalizeBallCollision(mRedPaddleRect);
+		if(mBall.goingUp() && mBall.collides(mRedPaddleRect) ) {
+			mBall.bouncePaddle(mRedPaddleRect);
 			increaseDifficulty();
 		}
-		else if(mBallAngle < Math.PI && ballCollides(mBluePaddleRect)) {
-			bounceBallHorizontal();
-			normalizeBallCollision(mBluePaddleRect);
+		else if(mBall.goingDown() && mBall.collides(mBluePaddleRect)) {
+			mBall.bouncePaddle(mBluePaddleRect);
 			increaseDifficulty();
 		}	
 	}
 	
-	protected void moveBall() {
-		int px = mBallPosition.x;
-		int py = mBallPosition.y;
-		
-		if(mBallCounter == 0) {
-			mBallPosition.set(
-					normalizeBallX((int) (px + mBallSpeed * Math.cos(mBallAngle)) ), 
-					py + mBallSpeed * Math.sin(mBallAngle)
-					);
-		}
-		else {
-			mBallCounter = Math.max(0, mBallCounter - 1);
-		}
-	}
-
 	/**
 	 * Moves the paddle toward a specific x-coordinate without overshooting it.
 	 * @param r, the Rect object to move.
@@ -333,34 +294,34 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		long start = System.currentTimeMillis();
 		
 		// vy = speed * sin(angle)
-		int vy = mDY;
+		int vy = mBall.dy;
 		
 		// Special case: move torward the center if the ball is blinking
-		if(mBallCounter > 0)
+		if(mBall.serving())
 			movePaddleTorward(cpu, mPaddleSpeed, getWidth() / 2);
 		
 		// Something is wrong if vy = 0.. let's wait until things fix themselves
 		if(vy == 0) return;
 		
 		// vx = speed * cos(angle)
-		int vx = mDX;
+		int vx = mBall.dx;
 		
 		// time of arrival = (ball.y - paddle.y) / vy;
-		int eta = (mBallPosition.getY() - cpu.centerY()) / -vy;
+		int eta = (int) ((mBall.y - cpu.centerY()) / -vy);
 		
-		int x = mBallPosition.getX();
-		int y = mBallPosition.getY();
+		int x = (int) mBall.x;
+		int y = (int) mBall.y;
 		
 		// Move toward the ball's current x position if it isn't coming right to us.
 		while(eta <= 0) {
 			y += vy;
-			x = normalizeBallX(x + vx);
+			x = (int) bound(x + vx, Ball.RADIUS, getWidth() - Ball.RADIUS);
 			
 			if(y <= mRedPaddleRect.centerY() && vy < 0 || y >= mBluePaddleRect.centerY() && vy > 0) {
 				vy = -vy;
 			}
 			
-			if(x == BALL_RADIUS || x == getWidth() - BALL_RADIUS) {
+			if(x == Ball.RADIUS || x == getWidth() - Ball.RADIUS) {
 				vx = -vx;
 			}
 			
@@ -370,9 +331,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		// Calculate its trajectory
 		while(y != cpu.centerY()) {
 			y = (Math.abs(cpu.centerY() - y) > Math.abs(vy)) ? y + vy : cpu.centerY();
-			x = normalizeBallX(x + vx);
+			x = (int) bound(x + vx, Ball.RADIUS, getWidth() - Ball.RADIUS);
 			
-			if(x == BALL_RADIUS || x == getWidth() - BALL_RADIUS) {
+			if(x == Ball.RADIUS || x == getWidth() - Ball.RADIUS) {
 				vx = -vx;
 			}
 		}
@@ -382,13 +343,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 */
 		
 		// If the ball is blinking, move back to the center
-		if(mBallCounter > 0) {
+		if(mBall.serving()) {
 			x = getWidth() / 2;
 		}
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
-		Random r = new Random(cpu.centerY() + mDX + mDY + salt);
+		Random r = new Random(cpu.centerY() + vx + vy + salt);
 		x += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
 		movePaddleTorward(cpu, mPaddleSpeed, x);
 		
@@ -407,40 +368,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 	}
 
-	/**
-	 * Provides such faculties as normalizing where the ball
-	 * will be painted as well as varying the angle at which the ball will fly
-	 * when it bounces off the paddle.
-	 * @param r
-	 */
-	private void normalizeBallCollision(Rect r) {
-		int x = mBallPosition.getX();
-		int y = mBallPosition.getY();
-		
-		// Quit if the ball is outside the width of the paddle
-		if(x < r.left || x > r.right) {
-			return;
-		}
-		
-		// Case if ball is above the paddle
-		if(y < r.top) {
-			mBallPosition.set(x, Math.min(y, r.top - BALL_RADIUS));
-		}
-		else if(y > r.bottom) {
-			mBallPosition.set(x, Math.max(y, r.bottom + BALL_RADIUS));
-		}
-		
-		
-		
-		/*double range = 4 * Math.PI / 9;
-		double amt = range * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
-		if(mBallAngle > Math.PI && x < r.centerX() || mBallAngle < Math.PI && x > r.centerX()) {
-			mBallAngle = safeRotate(mBallAngle, -amt);
-		}
-		else if(mBallAngle > Math.PI && x > r.centerX() || mBallAngle < Math.PI && x < r.centerX()) {
-			mBallAngle = safeRotate(mBallAngle, amt);
-		}*/
-	}
 	
 	/**
 	 * Rotate the ball's new angle within acceptable bounds.
@@ -461,44 +388,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		return Math.max(tolerance, Math.max(angle + amt, Math.PI - tolerance));
 	}
 
-	/**
-	 * Given it a coordinate, it transforms it into a proper x-coordinate for the ball.
-	 * @param x, the x-coord to transform
-	 * @return
-	 */
-	private int normalizeBallX(int x) {
-		return Math.max(BALL_RADIUS, Math.min(x, getWidth() - BALL_RADIUS));
-	}
-
-	/**
-	 * Tells us if the ball collides with a rectangle.
-	 * @param r, the rectangle
-	 * @return true if the ball is colliding, false if not
-	 */
-	private boolean ballCollides(Rect r) {
-		int x = mBallPosition.getX(); int y = mBallPosition.getY();
-		return y >= mRedPaddleRect.bottom && y <= mBluePaddleRect.bottom && 
-			x >= r.left && x <= r.right && 
-			y >= r.top - BALL_RADIUS && y <= r.bottom + BALL_RADIUS; 
-	}
-
-	/**
-	 * Method bounces the ball across a vertical axis. Seriously it's that easy.
-	 * Math failed me when figuring this out so I guessed instead.
-	 */
-	private void bounceBallVertical() {
-		int n = (mBallAngle <= Math.PI) ? 1 : 3;
-		mBallAngle = (n * Math.PI - mBallAngle) % (2 * Math.PI);
-		playSound(mWallHit);
-	}
-
-	/**
-	 * Bounce the ball off a horizontal axis.
-	 */
-	private void bounceBallHorizontal() {
-		mBallAngle = (2 * Math.PI - mBallAngle) % (2 * Math.PI);
-		playSound(mPaddleHit);
-	}
 
 	/**
 	 * Set the state, start a new round, start the loop if needed.
@@ -518,7 +407,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	setOnKeyListener(this);
     	setFocusable(true);
     	resetPaddles();
-    	mBallPosition = new Point(getWidth() / 2, getHeight() / 2);
+    	mBall.x = getWidth() / 2;
+    	mBall.y = getHeight() / 2;
     	
     	mWallHit = loadSound(R.raw.wall);
     	mPaddleHit = loadSound(R.raw.paddle);
@@ -546,7 +436,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	realignPaddles();
     	resetBall();
     	mFramesPerSecond = 30;
-    	mBallCounter = 60;
+    	mBall.pause();
     }
     
     private void realignPaddles() {
@@ -578,13 +468,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * Reset ball to an initial state
      */
     private void resetBall() {
-    	mBallPosition.set(getWidth() / 2, getHeight() / 2);
-    	randomizeBall();
-    	mBallCounter = 60;
+    	mBall.x = getWidth() / 2;
+    	mBall.y = getHeight() / 2;
+    	mBall.randomAngle();
+    	mBall.pause();
     }
     
-    protected void randomizeBall() {
-    	mBallAngle = 2 * Math.PI * RNG.nextDouble();
+    protected float bound(float x, float low, float hi) {
+    	return Math.max(low, Math.min(x, hi));
     }
     
     /**
@@ -649,12 +540,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         mPaint.setStyle(Style.FILL);
         mPaint.setColor(Color.WHITE);
         
-        if((mBallCounter / 10) % 2 == 1 || mBallCounter == 0)
-        	canvas.drawCircle(mBallPosition.getX(), mBallPosition.getY(), BALL_RADIUS, mPaint);
+        mBall.draw(canvas);
         
         // If either is a not a player, blink and let them know they can join in!
         // This blinks with the ball.
-        if(!mShowTitle && (mBallCounter / 10) % 2 == 1 && mBallCounter > 0) {
+        if(!mShowTitle && mBall.serving()) {
         	String join = context.getString(R.string.join_in);
         	int joinw = (int) mPaint.measureText(join);
         	
@@ -670,7 +560,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         }
         
         // Show where the player can touch to pause the game
-        if(!mShowTitle && (mBallCounter / 10) % 2 == 0 && mBallCounter > 0) {
+        if(!mShowTitle && mBall.serving()) {
         	String pause = context.getString(R.string.pause);
         	int pausew = (int) mPaint.measureText(pause);
         
@@ -694,16 +584,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         	mPaint.setColor(Color.WHITE);
         	mPaint.setStyle(Style.FILL_AND_STROKE);
         	for(int i = 0; i < mRedLives; i++) {
-        		canvas.drawCircle(BALL_RADIUS + PADDING + i * (2 * BALL_RADIUS + PADDING),
-        				PADDING + BALL_RADIUS,
-        				BALL_RADIUS,
+        		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
+        				PADDING + Ball.RADIUS,
+        				Ball.RADIUS,
         				mPaint);
         	}
         	
         	for(int i = 0; i < mBlueLives; i++) {
-        		canvas.drawCircle(BALL_RADIUS + PADDING + i * (2 * BALL_RADIUS + PADDING),
-        				getHeight() - PADDING - BALL_RADIUS,
-        				BALL_RADIUS,
+        		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
+        				getHeight() - PADDING - Ball.RADIUS,
+        				Ball.RADIUS,
         				mPaint);
         	}
         }
@@ -933,5 +823,144 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mp.setVolume(0.2f, 0.2f);
 			mp.start();
 		}
+	}
+	
+	class Ball {
+		public float x, y, xp, yp, vx, vy;
+		public float speed = SPEED;
+		
+		/** Actual amount of pixels moved */
+		public int dx, dy;
+		
+		protected double mAngle;
+		protected boolean mVectorKnown = false;
+		protected boolean mNextPointKnown = false;
+		protected int mCounter = 0;
+		
+		public Ball() {
+			findVector();
+		}
+		
+		protected void findVector() {
+			vx = (float) (SPEED * Math.cos(mAngle));
+			vy = (float) (SPEED * Math.sin(mAngle));
+			mVectorKnown = true;
+		}
+		
+		public boolean goingUp() {
+			return mAngle >= Math.PI;
+		}
+		
+		public boolean goingDown() {
+			return mAngle < Math.PI;
+		}
+		
+		public boolean serving() {
+			return mCounter > 0;
+		}
+		
+		public void pause() {
+			mCounter = 60;
+		}
+		
+		public void move() {
+			if(mCounter <= 0) {
+				x = keepX(x + vx); 
+				y += vy;
+			}
+			else {
+				mCounter--;
+			}
+			
+			
+			if(mCounter > 0) { mCounter--; return; }
+			float xo = x, yo = y;
+			x += vx;
+			y += vy;
+			
+			dx = (int) (x - xo);
+			dy = (int) (y - yo);
+		}
+		
+		public void randomAngle() {
+			mAngle = 2 * Math.PI * RNG.nextDouble();
+		}
+		
+		public void draw(Canvas canvas) {
+	        if((mCounter / 10) % 2 == 1 || mCounter == 0)
+	        	canvas.drawCircle(x, y, Ball.RADIUS, mPaint);
+		}
+		
+		/**
+		 * Tells us if the ball collides with a rectangle.
+		 * @param r, the rectangle
+		 * @return true if the ball is colliding, false if not
+		 */
+		public boolean collides(Rect r) {
+			return 	x >= r.left && x <= r.right && 
+				y >= r.top - RADIUS && y <= r.bottom + RADIUS; 
+		}
+		
+
+		/**
+		 * Method bounces the ball across a vertical axis. Seriously it's that easy.
+		 * Math failed me when figuring this out so I guessed instead.
+		 */
+		public void bouncePaddle(Rect r) {
+			int n = (mAngle <= Math.PI) ? 1 : 3;
+			mAngle = (n * Math.PI - mAngle) % (2 * Math.PI);
+			normalize(r);
+			findVector();
+		}
+
+		/**
+		 * Bounce the ball off a horizontal axis.
+		 */
+		public void bounceWall() {
+			mAngle = (2 * Math.PI - mAngle) % (2 * Math.PI);
+			findVector();
+		}
+		
+		/**
+		 * Normalizes a ball's position after it has hit a paddle.
+		 * @param r The paddle the ball has hit.
+		 */
+		protected void normalize(Rect r) {
+			// Quit if the ball is outside the width of the paddle
+			if(x < r.left || x > r.right) {
+				return;
+			}
+			
+			// Case if ball is above the paddle
+			if(y < r.top) {
+				y = Math.min(y, r.top - Ball.RADIUS);
+			}
+			else if(y > r.bottom) {
+				y = Math.max(y, r.bottom + Ball.RADIUS);
+			}
+			
+			/* TODO: Make this safe to use. Should "salt" the ball's angle when it hits a paddle.
+			 * double range = 4 * Math.PI / 9;
+			double amt = range * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
+			if(mBallAngle > Math.PI && x < r.centerX() || mBallAngle < Math.PI && x > r.centerX()) {
+				mBallAngle = safeRotate(mBallAngle, -amt);
+			}
+			else if(mBallAngle > Math.PI && x > r.centerX() || mBallAngle < Math.PI && x < r.centerX()) {
+				mBallAngle = safeRotate(mBallAngle, amt);
+			}*/
+		}
+		
+
+		/**
+		 * Given it a coordinate, it transforms it into a proper x-coordinate for the ball.
+		 * @param x, the x-coord to transform
+		 * @return
+		 */
+		protected float keepX(float x) {
+			return bound(x, Ball.RADIUS, getWidth() - Ball.RADIUS);
+		}
+		
+		public static final float SPEED = 4.0f; 
+		public static final int RADIUS = 4; 
 	}
 }
