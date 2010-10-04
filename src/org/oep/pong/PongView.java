@@ -294,7 +294,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		long start = System.currentTimeMillis();
 		
 		// vy = speed * sin(angle)
-		int vy = mBall.dy;
+		int vy = (int) mBall.vy;
 		
 		// Special case: move torward the center if the ball is blinking
 		if(mBall.serving())
@@ -304,7 +304,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		if(vy == 0) return;
 		
 		// vx = speed * cos(angle)
-		int vx = mBall.dx;
+		int vx = (int) mBall.vx;
 		
 		// time of arrival = (ball.y - paddle.y) / vy;
 		int eta = (int) ((mBall.y - cpu.centerY()) / -vy);
@@ -830,10 +830,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		public float speed = SPEED;
 		
 		/** Actual amount of pixels moved */
-		public int dx, dy;
+		//public int dx, dy;
 		
 		protected double mAngle;
-		protected boolean mVectorKnown = false;
 		protected boolean mNextPointKnown = false;
 		protected int mCounter = 0;
 		
@@ -842,9 +841,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 		
 		protected void findVector() {
-			vx = (float) (SPEED * Math.cos(mAngle));
-			vy = (float) (SPEED * Math.sin(mAngle));
-			mVectorKnown = true;
+			vx = (float) (speed * Math.cos(mAngle));
+			vy = (float) (speed * Math.sin(mAngle));
 		}
 		
 		public boolean goingUp() {
@@ -871,19 +869,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			else {
 				mCounter--;
 			}
-			
-			
-			if(mCounter > 0) { mCounter--; return; }
-			float xo = x, yo = y;
-			x += vx;
-			y += vy;
-			
-			dx = (int) (x - xo);
-			dy = (int) (y - yo);
 		}
 		
 		public void randomAngle() {
 			mAngle = 2 * Math.PI * RNG.nextDouble();
+			findVector();
 		}
 		
 		public void draw(Canvas canvas) {
@@ -907,8 +897,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * Math failed me when figuring this out so I guessed instead.
 		 */
 		public void bouncePaddle(Rect r) {
-			int n = (mAngle <= Math.PI) ? 1 : 3;
-			mAngle = (n * Math.PI - mAngle) % (2 * Math.PI);
+			// up-right case
+			if(mAngle >= Math.PI) {
+				mAngle = 4 * Math.PI - mAngle;
+			}
+			// down-left case
+			else {
+				mAngle = 2 * Math.PI - mAngle;
+			}
+			
+			mAngle %= 2 * Math.PI;
 			normalize(r);
 			findVector();
 		}
@@ -917,7 +915,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * Bounce the ball off a horizontal axis.
 		 */
 		public void bounceWall() {
-			mAngle = (2 * Math.PI - mAngle) % (2 * Math.PI);
+			mAngle = (3 * Math.PI - mAngle) % (2 * Math.PI);
 			findVector();
 		}
 		
