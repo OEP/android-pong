@@ -908,9 +908,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 				angle = 2 * Math.PI - mAngle;
 			}
 			
-			// angle = salt(angle, r);
+			angle %= (2 * Math.PI);
+			angle = salt(angle, r);
 			normalize(r);
-			
 			setAngle(angle);
 		}
 
@@ -918,8 +918,18 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * Bounce the ball off a horizontal axis.
 		 */
 		public void bounceWall() {
-			mAngle = (3 * Math.PI - mAngle) % (2 * Math.PI);
-			findVector();
+			setAngle(3 * Math.PI - mAngle);
+		}
+		
+		protected double salt(double angle, Rect paddle) {
+			int cx = paddle.centerX();
+			double halfWidth = paddle.width() / 2;
+			double change = 0.0;
+			
+			if(goingUp()) change = SALT * ((cx - x) / halfWidth);
+			else change = SALT * ((x - cx) / halfWidth);
+			
+			return boundAngle(angle, change);
 		}
 		
 		/**
@@ -941,8 +951,30 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			}
 		}
 		
+		/**
+		 * Bounds sum of <code>angle</code> and <code>angleChange</code> to the side of the
+		 * unit circle that <code>angle</code> is on.
+		 * @param angle The initial angle.
+		 * @param angleChange Amount to add to angle.
+		 * @return bounded angle sum
+		 */
+		protected double boundAngle(double angle, double angleChange) {
+			return boundAngle(angle + angleChange, angle >= Math.PI);
+		}
+		
 		protected double boundAngle(double angle) {
-			if(angle >= Math.PI) {
+			return boundAngle(angle, angle >= Math.PI);
+		}
+		
+		/**
+		 * Bounds an angle in radians to a subset of the top
+		 * or bottom part of the unit circle.
+		 * @param angle The angle in radians to bound.
+		 * @param top Flag which indicates if we should bound to the top or not.
+		 * @return the bounded angle
+		 */
+		protected double boundAngle(double angle, boolean top) {
+			if(top) {
 				return Math.max(Math.PI + BOUND, Math.min(2 * Math.PI - BOUND, angle));
 			}
 
@@ -961,6 +993,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		public static final double BOUND = Math.PI / 9;
 		public static final float SPEED = 4.0f; 
-		public static final int RADIUS = 4; 
+		public static final int RADIUS = 4;
+		public static final double SALT = 4 * Math.PI / 9;
 	}
 }
