@@ -16,7 +16,6 @@ import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -33,6 +32,7 @@ import android.widget.Toast;
 public class PongView extends View implements OnTouchListener, OnKeyListener, OnCompletionListener {
 	/** Debug tag */
 	private static final String TAG = "PongView";
+	protected static final int FPS = 30;
 	
 	/**
 	 * This is mostly deprecated but kept around if the need
@@ -41,8 +41,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	private State mCurrentState = State.Running;
 	private State mLastState = State.Stopped;
 	public static enum State { Running, Stopped}
-
-	protected int projx, projy;
 
 	/** Flag that marks this view as initialized */
 	private boolean mInitialized = false;
@@ -86,12 +84,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Flag to indicate the human-ness of blue */
 	private boolean mBlueIsPlayer = false;
 
-	/** Framerate of the game */
-	private int mFramesPerSecond = 30;
-	
-	/** Amount to increment framerate each paddle hit */
-	private int mFrameSkips = 5;
-	
 	/** Timestamp of the last frame created */
 	private long mLastFrame = 0;
 
@@ -172,7 +164,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      */
     public void update() {
     	if(getHeight() == 0 || getWidth() == 0) {
-    		mRedrawHandler.sleep(1000 / mFramesPerSecond);
+    		mRedrawHandler.sleep(1000 / FPS);
     		return;
     	}
     	
@@ -184,7 +176,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	long now = System.currentTimeMillis();
     	if(gameRunning() && mCurrentState != State.Stopped) {
-	    	if(now - mLastFrame >= 1000 / mFramesPerSecond) {
+	    	if(now - mLastFrame >= 1000 / FPS) {
 	    		if(mNewRound) {
 	    			nextRound();
 	    			mNewRound = false;
@@ -198,7 +190,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	if(mContinue) {
     		long diff = System.currentTimeMillis() - now;
-    		mRedrawHandler.sleep(Math.max(0, (1000 / mFramesPerSecond) - diff) );
+    		mRedrawHandler.sleep(Math.max(0, (1000 / FPS) - diff) );
     	}
     }
 
@@ -207,14 +199,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * Given some initial game state, it computes the next game state.
      */
 	private void doGameLogic() {
-		float px = mBall.x;
 		float py = mBall.y;
 		
 		mBall.move();
 		
 		// Shake it up if it appears to not be moving vertically
 		if(py == mBall.y) {
-			//mBall.randomAngle();
+			mBall.randomAngle();
 		}
 		
 		// Do some basic paddle AI
@@ -292,8 +283,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * @param cpu
 	 */
 	private void doAI(Rect cpu, Rect opp) {
-		long start = System.currentTimeMillis();
-		
 		Ball ball = new Ball(mBall);
 		
 		// Special case: move torward the center if the ball is blinking
@@ -347,8 +336,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			prediction = (Ball.RADIUS + playWidth) - remains;
 		}
 		
-		if(cpu == mBluePaddleRect) {
-			projx = (int) ball.x;
+		/*if(cpu == mBluePaddleRect) {
+			projx = (int) prediction;
 			projy = mBluePaddleRect.centerY();
 			
 			Log.d(TAG, "Distance to blue: " + oppDist);
@@ -366,21 +355,17 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			
 			Log.d(TAG, "Bounces: " + bounces);
 			
-			Log.d(TAG, "Prediction: " + ball.x);
+			Log.d(TAG, "Prediction: " + prediction);
 			
 			System.currentTimeMillis();
-		}
+		}*/
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
 		Random r = new Random((long) (cpu.centerY() + ball.vx + ball.vy + salt));
 		prediction += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
-		movePaddleTorward(cpu, mPaddleSpeed, ball.x);
+		movePaddleTorward(cpu, mPaddleSpeed, prediction);
 		
-		
-		long stop = System.currentTimeMillis();
-		
-//		Log.d(TAG, String.format("AI took %d ms", stop - start));
 	}
 	
 	/**
@@ -389,27 +374,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	private void increaseDifficulty() {
 		mBall.speed++;
 	}
-
-	
-	/**
-	 * Rotate the ball's new angle within acceptable bounds.
-	 * Prevents the ball from having no y-velocity.
-	 * @param ballAngle
-	 * @param amt The amount to rotate the angle
-	 * @return new ball angle
-	 */
-	private double safeRotate(double angle, double amt) {
-		double tolerance = Math.PI / 8;
-		
-		if(angle < Math.PI) {
-			// Bound new angle in [tolerance, PI - tolerance]
-			return Math.max(tolerance, Math.max(angle + amt, Math.PI - tolerance));
-		}
-		
-		// Otherwise, keep it in [PI + tolerance, 2*PI - tolerance
-		return Math.max(tolerance, Math.max(angle + amt, Math.PI - tolerance));
-	}
-
 
 	/**
 	 * Set the state, start a new round, start the loop if needed.
@@ -456,7 +420,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	realignPaddles();
     	resetBall();
-    	mFramesPerSecond = 30;
+    	mBall.speed = Ball.SPEED;
     	mBall.pause();
     }
     
@@ -491,8 +455,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     private void resetBall() {
     	mBall.x = getWidth() / 2;
     	mBall.y = getHeight() / 2;
-//    	mBall.randomAngle();
-    	mBall.setAngle(Math.PI / 8);
+    	mBall.randomAngle();
     	mBall.pause();
     }
     
@@ -536,21 +499,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      */
     @Override
     public void onDraw(Canvas canvas) {
-    	long start = System.currentTimeMillis();
-    	
         super.onDraw(canvas);
     	Context context = getContext();
     	
-    	mPaint.setColor(Color.GREEN);
-    	mPaint.setStyle(Style.FILL);
-    	canvas.drawCircle(projx, projy, Ball.RADIUS, mPaint);
-        
         // Draw the paddles / touch boundaries
         mPaint.setStyle(Style.FILL);
         mPaint.setColor(Color.RED);
         canvas.drawRect(mRedPaddleRect, mPaint);
-        
-        
         
         if(gameRunning() && mRedIsPlayer && mCurrentState == State.Running)
         	canvas.drawLine(mRedTouchBox.left, mRedTouchBox.bottom, mRedTouchBox.right, mRedTouchBox.bottom, mPaint);
@@ -658,10 +613,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         	int w = (int) mPaint.measureText(prompt);
         	canvas.drawText(prompt, getWidth() / 2 - w / 2, nextLine, mPaint);
         }
-        
-        long stop = System.currentTimeMillis();
-        
-//        Log.d(TAG, String.format("Draw took %d ms", stop - start));
     }
 
     /**
@@ -738,7 +689,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	public void newGame() {
 		mRedLives = 3;
 		mBlueLives = 3;
-		mFrameSkips = 5;
 		
 		resetPaddles();
 		nextRound();
@@ -917,7 +867,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			}
 		}
 		
-		public void randomAndgle() {
+		public void randomAngle() {
 			setAngle( 2 * Math.PI * RNG.nextDouble() );
 		}
 		
