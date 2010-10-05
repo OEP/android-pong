@@ -42,6 +42,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	private State mLastState = State.Stopped;
 	public static enum State { Running, Stopped}
 
+	protected int projx, projy;
 
 	/** Flag that marks this view as initialized */
 	private boolean mInitialized = false;
@@ -213,7 +214,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Shake it up if it appears to not be moving vertically
 		if(py == mBall.y) {
-			mBall.randomAngle();
+			//mBall.randomAngle();
 		}
 		
 		// Do some basic paddle AI
@@ -296,7 +297,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		Ball ball = new Ball(mBall);
 		
 		// Special case: move torward the center if the ball is blinking
-		if(ball.serving()) {
+		if(mBall.serving()) {
 			movePaddleTorward(cpu, mPaddleSpeed, getWidth() / 2);
 			return;
 		}
@@ -305,54 +306,77 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		if(ball.vy == 0) return;
 		
 		// Y-Distance from ball to Rect 'cpu'
-		float dq = Math.abs(ball.y - cpu.centerY());
+		float cpuDist = Math.abs(ball.y - cpu.centerY());
 		// Y-Distance to opponent.
-		float dp = Math.abs( ball.y - opp.centerY() );
+		float oppDist = Math.abs( ball.y - opp.centerY() );
 		
 		// Distance between two paddles.
-		float dpq = Math.abs(cpu.centerY() - opp.centerY());
+		float paddleDistance = Math.abs(cpu.centerY() - opp.centerY());
 		
 		// Is the ball coming at us?
 		boolean coming = (cpu.centerY() < ball.y && ball.vy < 0)
 			|| (cpu.centerY() > ball.y && ball.vy > 0);
 		
 		// Total amount of x-distance the ball covers
-		float total = ((((coming) ? dp : dq + dpq)) / ball.vy) * Math.abs( ball.vx );
+		float total = ((((coming) ? cpuDist : oppDist + paddleDistance)) / Math.abs(ball.vy)) * Math.abs( ball.vx );
 		
 		// Playable width of the stage
 		float playWidth = getWidth() - 2 * Ball.RADIUS;
 		
-		// Effective x-translation left over 
-		float remains = total % playWidth;
 		
-		float wallDist = (ball.goingLeft()) ? ball.x : playWidth - ball.x;
+		float wallDist = (ball.goingLeft()) ? ball.x - Ball.RADIUS : playWidth - ball.x + Ball.RADIUS;
+		
+		// Effective x-translation left over after first bounce 
+		float remains = (total - wallDist) % playWidth;
 		
 		// Bounces the ball will incur
-		int bounces = 1 + (int) (total / playWidth);
+		int bounces = (int) ((total) / playWidth);
+		
+		boolean left = (bounces % 2 == 0) ? !ball.goingLeft() : ball.goingLeft();
+		
+		float prediction = getWidth() / 2;
 		
 		// Now we need to compute the final x. That's all that matters.
-		if(bounces % 2 != 0 && ball.goingLeft()) {
-			ball.x = remains - ball.x;
+		if(bounces == 0) {
+			prediction = ball.x + total * Math.signum(ball.vx);
+		}
+		else if(left) {
+			prediction = Ball.RADIUS + remains;
 		}
 		else { // The ball is going right...
-			ball.x = (Ball.RADIUS + playWidth) - remains - ball.x;
+			prediction = (Ball.RADIUS + playWidth) - remains;
 		}
 		
-				
-		/*
-		 * SPECIAL ATTACKS!!!
-		 */
-		
-		// If the ball is blinking, move back to the center
-		if(mBall.serving()) {
-			ball.x = getWidth() / 2;
+		if(cpu == mBluePaddleRect) {
+			projx = (int) ball.x;
+			projy = mBluePaddleRect.centerY();
+			
+			Log.d(TAG, "Distance to blue: " + oppDist);
+			Log.d(TAG, "Distance to red: " + cpuDist);
+			Log.d(TAG, "Distance from red to blue: " + paddleDistance);
+			
+			Log.d(TAG, String.format("Ball V: <%f, %f>\n", ball.vx, ball.vy));
+			Log.d(TAG, String.format("Ball P: <%f, %f>\n", ball.x, ball.y));
+			
+			Log.d(TAG, "Total x-dist: " + total);
+			Log.d(TAG, "Total wall-dist: " + wallDist);
+			Log.d(TAG, "Total playWidth: " + playWidth);
+			Log.d(TAG, "Total remains: " + remains);
+			
+			
+			Log.d(TAG, "Bounces: " + bounces);
+			
+			Log.d(TAG, "Prediction: " + ball.x);
+			
+			System.currentTimeMillis();
 		}
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
 		Random r = new Random((long) (cpu.centerY() + ball.vx + ball.vy + salt));
-		ball.x += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
+		prediction += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
 		movePaddleTorward(cpu, mPaddleSpeed, ball.x);
+		
 		
 		long stop = System.currentTimeMillis();
 		
@@ -405,8 +429,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	setOnKeyListener(this);
     	setFocusable(true);
     	resetPaddles();
-    	mBall.x = getWidth() / 2;
-    	mBall.y = getHeight() / 2;
+    	resetBall();
     	
     	mWallHit = loadSound(R.raw.wall);
     	mPaddleHit = loadSound(R.raw.paddle);
@@ -468,7 +491,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     private void resetBall() {
     	mBall.x = getWidth() / 2;
     	mBall.y = getHeight() / 2;
-    	mBall.randomAngle();
+//    	mBall.randomAngle();
+    	mBall.setAngle(Math.PI / 8);
     	mBall.pause();
     }
     
@@ -516,6 +540,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
         super.onDraw(canvas);
     	Context context = getContext();
+    	
+    	mPaint.setColor(Color.GREEN);
+    	mPaint.setStyle(Style.FILL);
+    	canvas.drawCircle(projx, projy, Ball.RADIUS, mPaint);
         
         // Draw the paddles / touch boundaries
         mPaint.setStyle(Style.FILL);
@@ -889,8 +917,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			}
 		}
 		
-		public void randomAngle() {
-			mAngle = 2 * Math.PI * RNG.nextDouble();
+		public void randomAndgle() {
+			setAngle( 2 * Math.PI * RNG.nextDouble() );
+		}
+		
+		public void setAngle(double angle) {
+			mAngle = angle % (2 * Math.PI);
+			mAngle = boundAngle(mAngle);
 			findVector();
 		}
 		
@@ -914,18 +947,21 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * Math failed me when figuring this out so I guessed instead.
 		 */
 		public void bouncePaddle(Rect r) {
+			double angle;
+			
 			// up-right case
 			if(mAngle >= Math.PI) {
-				mAngle = 4 * Math.PI - mAngle;
+				angle = 4 * Math.PI - mAngle;
 			}
 			// down-left case
 			else {
-				mAngle = 2 * Math.PI - mAngle;
+				angle = 2 * Math.PI - mAngle;
 			}
 			
-			mAngle %= 2 * Math.PI;
+			// angle = salt(angle, r);
 			normalize(r);
-			findVector();
+			
+			setAngle(angle);
 		}
 
 		/**
@@ -953,16 +989,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			else if(y > r.bottom) {
 				y = Math.max(y, r.bottom + Ball.RADIUS);
 			}
-			
-			/* TODO: Make this safe to use. Should "salt" the ball's angle when it hits a paddle.
-			 * double range = 4 * Math.PI / 9;
-			double amt = range * Math.abs(x - r.centerX()) / Math.abs(r.left - r.centerX());
-			if(mBallAngle > Math.PI && x < r.centerX() || mBallAngle < Math.PI && x > r.centerX()) {
-				mBallAngle = safeRotate(mBallAngle, -amt);
+		}
+		
+		protected double boundAngle(double angle) {
+			if(angle >= Math.PI) {
+				return Math.max(Math.PI + BOUND, Math.min(2 * Math.PI - BOUND, angle));
 			}
-			else if(mBallAngle > Math.PI && x > r.centerX() || mBallAngle < Math.PI && x < r.centerX()) {
-				mBallAngle = safeRotate(mBallAngle, amt);
-			}*/
+
+			return Math.max(BOUND, Math.min(Math.PI - BOUND, angle));
 		}
 		
 
@@ -975,6 +1009,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			return bound(x, Ball.RADIUS, getWidth() - Ball.RADIUS);
 		}
 		
+		public static final double BOUND = Math.PI / 9;
 		public static final float SPEED = 4.0f; 
 		public static final int RADIUS = 4; 
 	}
