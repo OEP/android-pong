@@ -34,6 +34,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	private static final String TAG = "PongView";
 	protected static final int FPS = 30;
 	
+	public static final int
+		STARTING_LIVES = 3,
+		PLAYER_PADDLE_SPEED = 10,
+		CPU_HANDICAP_EASY = 7,
+		CPU_HANDICAP_MED = 5,
+		CPU_HANDICAP_HARD = 3,
+		CPU_HANDICAP_IMPOSSIBLE = 1;
+	
+	
+	
 	/**
 	 * This is mostly deprecated but kept around if the need
 	 * to add more game states comes around.
@@ -65,9 +75,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Timestamp of the last frame created */
 	private long mLastFrame = 0;
 
-	/** Speed of the paddles */
-	private int mPaddleSpeed = 2;
-	
 	protected Ball mBall = new Ball();
 
 	/** Random number generator */
@@ -123,12 +130,31 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      */
     public PongView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        initPongView();
+        constructView();
     }
 
     public PongView(Context context, AttributeSet attrs, int defStyle) {
     	super(context, attrs, defStyle);
-    	initPongView();
+    	constructView();
+    }
+    
+    /**
+     * Set the paddles to their initial states and as well the ball.
+     */
+    private void constructView() {
+    	setOnTouchListener(this);
+    	setOnKeyListener(this);
+    	setFocusable(true);
+    	
+    	mWallHit = loadSound(R.raw.wall);
+    	mPaddleHit = loadSound(R.raw.paddle);
+    	mMissTone = loadSound(R.raw.ballmiss);
+    	mWinTone = loadSound(R.raw.wintone);
+    	
+    	// Grab the muted preference
+    	Context ctx = this.getContext();
+    	SharedPreferences settings = ctx.getSharedPreferences(Pong.DB_PREFS, 0);
+    	mMuted = settings.getBoolean(Pong.PREF_MUTED, mMuted);
     }
     
     /**
@@ -141,8 +167,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	}
     	
     	if(!mInitialized) {
-    		nextRound();
-    		newGame();
+    		initializePongView();
     		mInitialized = true;
     	}
     	
@@ -209,6 +234,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		// Handle bouncing off of a wall
 		if(mBall.x <= Ball.RADIUS || mBall.x >= getWidth() - Ball.RADIUS) {
 			mBall.bounceWall();
+			playSound(mWallHit);
 			if(mBall.x == Ball.RADIUS)
 				mBall.x++;
 			else
@@ -218,10 +244,12 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		// Bouncing off the paddles
 		if(mBall.goingUp() && mBall.collides(mRed) ) {
 			mBall.bouncePaddle(mRed);
+			playSound(mPaddleHit);
 			increaseDifficulty();
 		}
 		else if(mBall.goingDown() && mBall.collides(mBlue)) {
 			mBall.bouncePaddle(mBlue);
+			playSound(mPaddleHit);
 			increaseDifficulty();
 		}	
 	}
@@ -315,7 +343,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		int salt = (int) (System.currentTimeMillis() / 10000);
 		Random r = new Random((long) (red.centerY() + ball.vx + ball.vy + salt));
 		int width = red.getWidth();
-		red.destination += r.nextInt(2 * width - (width / 5)) - width + (width / 10);
+		red.destination = (int) bound(
+				red.destination + r.nextInt(2 * width - (width / 5)) - width + (width / 10),
+				0, getWidth()
+		);
 		red.move(true);
 	}
 	
@@ -335,63 +366,52 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	nextRound();
     	update();
     }
-    
-    /**
-     * Set the paddles to their initial states and as well the ball.
-     */
-    private void initPongView() {
-    	setOnTouchListener(this);
-    	setOnKeyListener(this);
-    	setFocusable(true);
-    	resetPaddles();
-    	resetBall();
-    	
-    	mWallHit = loadSound(R.raw.wall);
-    	mPaddleHit = loadSound(R.raw.paddle);
-    	mMissTone = loadSound(R.raw.ballmiss);
-    	mWinTone = loadSound(R.raw.wintone);
-    	
-    	// Grab the muted preference
-    	Context ctx = this.getContext();
-    	SharedPreferences settings = ctx.getSharedPreferences(Pong.DB_PREFS, 0);
-    	mMuted = settings.getBoolean(Pong.PREF_MUTED, mMuted);
-    }
-    
+	
     /**
      * Reset the paddles/touchboxes/framespersecond/ballcounter for the next round.
      */
     private void nextRound() {
+    	serveBall();
+    }
+    
+    /**
+     * Initializes objects needed to carry out the game.
+     * This should be called once as soon as the View has reached
+     * its inflated size.
+     */
+    private void initializePongView() {
+    	initializePause();
+    	initializePaddles();
+    }
+    
+    private void initializePause() {
     	int min = Math.min(getWidth() / 4, getHeight() / 4);
     	int xmid = getWidth() / 2;
     	int ymid = getHeight() / 2;
     	mPauseTouchBox = new Rect(xmid - min, ymid - min, xmid + min, ymid + min);
-    	
-    	resetPaddles();
-    	resetBall();
-    	mBall.speed = Ball.SPEED;
-    	mBall.pause();
     }
     
-	/**
-     * Reset paddles to an initial state.
-     */
-    private void resetPaddles() {
-    	mRed = new Paddle(Color.RED, PADDING);
-    	mBlue = new Paddle(Color.BLUE, getHeight() - PADDING - Paddle.PADDLE_THICKNESS);
+    private void initializePaddles() {
+    	Rect redTouch = new Rect(0,0,getWidth(),getHeight() / 8);
+    	Rect blueTouch = new Rect(0, 7 * getHeight() / 8, getWidth(), getHeight());
     	
-    	mRed.setTouchbox( new Rect(0,0,getWidth(),getHeight() / 8) );
-    	mBlue.setTouchbox( new Rect(0, 7 * getHeight() / 8, getWidth(), getHeight()) );
+    	mRed = new Paddle(Color.RED, redTouch.bottom + PADDING);
+    	mBlue = new Paddle(Color.BLUE, blueTouch.top - PADDING - Paddle.PADDLE_THICKNESS);
     	
-    	mRed.destination = getWidth() / 2;
-    	mBlue.destination = getWidth() / 2;
+    	mRed.setTouchbox( redTouch );
+    	mBlue.setTouchbox( blueTouch );
+    	
+    	mRed.setHandicap(CPU_HANDICAP_EASY);
+    	mBlue.setHandicap(CPU_HANDICAP_EASY);
     }
     
     /**
      * Reset ball to an initial state
      */
-    private void resetBall() {
+    private void serveBall() {
     	mBall.x = getWidth() / 2;
     	mBall.y = getHeight() / 2;
+    	mBall.speed = Ball.SPEED;
     	mBall.randomAngle();
     	mBall.pause();
     }
@@ -428,7 +448,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     }
     
     public void onSizeChanged(int w, int h, int ow, int oh) {
-    	mPaddleSpeed = Math.max(1, w / 160);
     }
     
     /**
@@ -437,6 +456,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     @Override
     public void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        
+        if(mInitialized == false) {
+        	return;
+        }
+        
     	Context context = getContext();
     	
         // Draw the paddles / touch boundaries
@@ -620,8 +644,22 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Reset the lives, paddles and the like for a new game.
 	 */
 	public void newGame() {
-		nextRound();
+		resetPaddles();
+		serveBall();
 		resumeLastState();
+	}
+	
+	/**
+	 * Resets the lives and the position of the paddles.
+	 */
+	private void resetPaddles() {
+		int mid = getWidth() / 2;
+		mRed.setPosition(mid);
+		mBlue.setPosition(mid);
+		mRed.destination = mid;
+		mBlue.destination = mid;
+		mRed.setLives(STARTING_LIVES);
+		mBlue.setLives(STARTING_LIVES);
 	}
 	
 	/**
@@ -667,6 +705,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	public void setPlayerControl(boolean red, boolean blue) {
 		mRed.player = red;
 		mBlue.player = blue;
+		newGame();
 	}
 
 	public void onCompletion(MediaPlayer mp) {
@@ -929,8 +968,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		protected Rect mRect;
 		protected Rect mTouch;
 		protected int mHandicap = 0;
-		protected int mSpeed = 4;
-		protected int mLives = 3;
+		protected int mSpeed = PLAYER_PADDLE_SPEED;
+		protected int mLives = STARTING_LIVES;
 		
 		public boolean player = false;
 
@@ -940,8 +979,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mColor = c;
 			
 			int mid = PongView.this.getWidth() / 2;
-			mRect = new Rect(mid - PADDLE_WIDTH / 2, y,
-					mid + PADDLE_WIDTH / 2, y + PADDLE_THICKNESS);
+			mRect = new Rect(mid - PADDLE_WIDTH, y,
+					mid + PADDLE_WIDTH, y + PADDLE_THICKNESS);
 			destination = mid;
 		}
 		
@@ -960,8 +999,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 				mRect.offset( (dx > s) ? -s : -dx, 0);
 			}
 			else if(destination > mRect.centerX()) {
-				mRect.offset( (dx > mSpeed) ? mSpeed : dx, 0);
+				mRect.offset( (dx > s) ? s : dx, 0);
 			}
+		}
+		
+		public void setLives(int lives) {
+			mLives = Math.max(0, lives);
+		}
+		
+		public void setPosition(int x) {
+			mRect.offset(x - mRect.centerX(), 0);
 		}
 		
 		public void setTouchbox(Rect r) {
