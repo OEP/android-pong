@@ -57,32 +57,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Mutes sounds when true */
 	private boolean mMuted = false;
 
-	/** Red player paddle bounds */
-	private Rect mRedPaddleRect = new Rect();
-	
-	/** Blue player paddle bounds */
-	private Rect mBluePaddleRect = new Rect();
+	private Paddle mRed, mBlue;
 	
 	/** Touch boxes for various functions. These are assigned in initialize() */
-	private Rect mRedTouchBox, mBlueTouchBox, mPauseTouchBox;
-
-	/** Last x-coordinate of red player's touch */
-	private float mRedLastTouch = 0;
-	
-	/** Last x-coordinate of blue player's touch */
-	private float mBlueLastTouch = 0;
-	
-	/** Red player's lives */
-	private int mRedLives;
-	
-	/** Blue player's lives */
-	private int mBlueLives;
-	
-	/** Flag to indicate the human-ness of red */
-	private boolean mRedIsPlayer = false;
-	
-	/** Flag to indicate the human-ness of blue */
-	private boolean mBlueIsPlayer = false;
+	private Rect mPauseTouchBox;
 
 	/** Timestamp of the last frame created */
 	private long mLastFrame = 0;
@@ -98,12 +76,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Paint object */
 	private final Paint mPaint = new Paint();
 
-	/** Thickness of the paddle */
-	private static final int PADDLE_THICKNESS = 10;
-	
-	/** Width of the paddle */
-	private static final int PADDLE_WIDTH = 40;
-	
 	/** Padding for touch zones and paddles */
 	private static final int PADDING = 3;
 	
@@ -209,29 +181,24 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 		
 		// Do some basic paddle AI
-		if(!mRedIsPlayer)
-			doAI(mRedPaddleRect, mBluePaddleRect);
-		else 
-			movePaddleTorward(mRedPaddleRect, 8 * mPaddleSpeed, mRedLastTouch);
+		if(!mRed.player) doAI(mRed, mBlue);
+		else mRed.move();
 		
-		
-		if(!mBlueIsPlayer)
-			doAI(mBluePaddleRect, mRedPaddleRect);
-		else
-			movePaddleTorward(mBluePaddleRect, 8 * mPaddleSpeed, mBlueLastTouch);
+		if(!mBlue.player) doAI(mBlue, mRed);
+		else mBlue.move();
 		
 		// See if all is lost
 		if(mBall.y >= getHeight()) {
 			mNewRound = true;
-			mBlueLives = Math.max(0, mBlueLives - 1);
+			mBlue.loseLife();
 			
-			if(mBlueLives != 0 || mShowTitle) playSound(mMissTone);
+			if(mBlue.living() || mShowTitle) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
 		else if (mBall.y <= 0) {
 			mNewRound = true;
-			mRedLives = Math.max(0, mRedLives - 1);
-			if(mRedLives != 0 || mShowTitle) playSound(mMissTone);
+			mRed.loseLife();
+			if(mRed.living() || mShowTitle) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
 		
@@ -249,45 +216,29 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 		
 		// Bouncing off the paddles
-		if(mBall.goingUp() && mBall.collides(mRedPaddleRect) ) {
-			mBall.bouncePaddle(mRedPaddleRect);
+		if(mBall.goingUp() && mBall.collides(mRed) ) {
+			mBall.bouncePaddle(mRed);
 			increaseDifficulty();
 		}
-		else if(mBall.goingDown() && mBall.collides(mBluePaddleRect)) {
-			mBall.bouncePaddle(mBluePaddleRect);
+		else if(mBall.goingDown() && mBall.collides(mBlue)) {
+			mBall.bouncePaddle(mBlue);
 			increaseDifficulty();
 		}	
 	}
 	
 	/**
-	 * Moves the paddle toward a specific x-coordinate without overshooting it.
-	 * @param r, the Rect object to move.
-	 * @param speed, the speed at which the paddle moves at maximum.
-	 * @param x, the x-coordinate to move to.
-	 */
-	private void movePaddleTorward(Rect r, int speed, float x) {
-		int dx = (int) Math.abs(r.centerX() - x);
-		
-		if(x < r.centerX()) {
-			r.offset( (dx > speed) ? -speed : -dx, 0);
-		}
-		else if(x > r.centerX()) {
-			r.offset( (dx > speed) ? speed : dx, 0);
-		}
-	}
-
-	/**
 	 * A generalized Pong AI player. Takes a Rect object and a Ball, computes where the ball will
 	 * be when ball.y == rect.y, and tries to move toward that x-coordinate. If the ball is moving
 	 * straight it will try to clip the ball with the edge of the paddle.
-	 * @param cpu
+	 * @param red
 	 */
-	private void doAI(Rect cpu, Rect opp) {
+	private void doAI(Paddle red, Paddle blue) {
 		Ball ball = new Ball(mBall);
 		
 		// Special case: move torward the center if the ball is blinking
 		if(mBall.serving()) {
-			movePaddleTorward(cpu, mPaddleSpeed, getWidth() / 2);
+			red.destination = getWidth() / 2;
+			red.move(true);
 			return;
 		}
 		
@@ -295,16 +246,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		if(ball.vy == 0) return;
 		
 		// Y-Distance from ball to Rect 'cpu'
-		float cpuDist = Math.abs(ball.y - cpu.centerY());
+		float cpuDist = Math.abs(ball.y - red.centerY());
 		// Y-Distance to opponent.
-		float oppDist = Math.abs( ball.y - opp.centerY() );
+		float oppDist = Math.abs( ball.y - blue.centerY() );
 		
 		// Distance between two paddles.
-		float paddleDistance = Math.abs(cpu.centerY() - opp.centerY());
+		float paddleDistance = Math.abs(red.centerY() - blue.centerY());
 		
 		// Is the ball coming at us?
-		boolean coming = (cpu.centerY() < ball.y && ball.vy < 0)
-			|| (cpu.centerY() > ball.y && ball.vy > 0);
+		boolean coming = (red.centerY() < ball.y && ball.vy < 0)
+			|| (red.centerY() > ball.y && ball.vy > 0);
 		
 		// Total amount of x-distance the ball covers
 		float total = ((((coming) ? cpuDist : oppDist + paddleDistance)) / Math.abs(ball.vy)) * Math.abs( ball.vx );
@@ -323,17 +274,17 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		boolean left = (bounces % 2 == 0) ? !ball.goingLeft() : ball.goingLeft();
 		
-		float prediction = getWidth() / 2;
+		red.destination = getWidth() / 2;
 		
 		// Now we need to compute the final x. That's all that matters.
 		if(bounces == 0) {
-			prediction = ball.x + total * Math.signum(ball.vx);
+			red.destination = (int) (ball.x + total * Math.signum(ball.vx));
 		}
 		else if(left) {
-			prediction = Ball.RADIUS + remains;
+			red.destination = (int) (Ball.RADIUS + remains);
 		}
 		else { // The ball is going right...
-			prediction = (Ball.RADIUS + playWidth) - remains;
+			red.destination = (int) ((Ball.RADIUS + playWidth) - remains);
 		}
 		
 		/*if(cpu == mBluePaddleRect) {
@@ -362,10 +313,10 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
-		Random r = new Random((long) (cpu.centerY() + ball.vx + ball.vy + salt));
-		prediction += r.nextInt(2 * PADDLE_WIDTH - (PADDLE_WIDTH / 5)) - PADDLE_WIDTH + (PADDLE_WIDTH / 10);
-		movePaddleTorward(cpu, mPaddleSpeed, prediction);
-		
+		Random r = new Random((long) (red.centerY() + ball.vx + ball.vy + salt));
+		int width = red.getWidth();
+		red.destination += r.nextInt(2 * width - (width / 5)) - width + (width / 10);
+		red.move(true);
 	}
 	
 	/**
@@ -410,43 +361,29 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * Reset the paddles/touchboxes/framespersecond/ballcounter for the next round.
      */
     private void nextRound() {
-    	mRedTouchBox = new Rect(0,0,getWidth(),getHeight() / 8);
-    	mBlueTouchBox = new Rect(0, 7 * getHeight() / 8, getWidth(), getHeight());
-    	
     	int min = Math.min(getWidth() / 4, getHeight() / 4);
     	int xmid = getWidth() / 2;
     	int ymid = getHeight() / 2;
     	mPauseTouchBox = new Rect(xmid - min, ymid - min, xmid + min, ymid + min);
     	
-    	realignPaddles();
+    	resetPaddles();
     	resetBall();
     	mBall.speed = Ball.SPEED;
     	mBall.pause();
     }
     
-    private void realignPaddles() {
-		mRedPaddleRect.top = mRedTouchBox.bottom + PADDING;
-		mRedPaddleRect.bottom = mRedPaddleRect.top + PADDLE_THICKNESS;
-		
-		mBluePaddleRect.bottom = mBlueTouchBox.top - PADDING;
-		mBluePaddleRect.top = mBluePaddleRect.bottom - PADDLE_THICKNESS;
-	}
-
 	/**
      * Reset paddles to an initial state.
      */
     private void resetPaddles() {
-    	mRedPaddleRect.top = PADDING;
-    	mRedPaddleRect.bottom = PADDING + PADDLE_THICKNESS;
+    	mRed = new Paddle(Color.RED, PADDING);
+    	mBlue = new Paddle(Color.BLUE, getHeight() - PADDING - Paddle.PADDLE_THICKNESS);
     	
-    	mBluePaddleRect.top = getHeight() - PADDING - PADDLE_THICKNESS;
-    	mBluePaddleRect.bottom = getHeight() - PADDING;
+    	mRed.setTouchbox( new Rect(0,0,getWidth(),getHeight() / 8) );
+    	mBlue.setTouchbox( new Rect(0, 7 * getHeight() / 8, getWidth(), getHeight()) );
     	
-    	mBluePaddleRect.left = mRedPaddleRect.left = getWidth() / 2 - PADDLE_WIDTH;
-    	mBluePaddleRect.right = mRedPaddleRect.right = getWidth() / 2 + PADDLE_WIDTH;
-    	
-    	mRedLastTouch = getWidth() / 2;
-    	mBlueLastTouch = getWidth() / 2;
+    	mRed.destination = getWidth() / 2;
+    	mBlue.destination = getWidth() / 2;
     }
     
     /**
@@ -503,19 +440,15 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	Context context = getContext();
     	
         // Draw the paddles / touch boundaries
-        mPaint.setStyle(Style.FILL);
-        mPaint.setColor(Color.RED);
-        canvas.drawRect(mRedPaddleRect, mPaint);
+    	mRed.draw(canvas);
+    	mBlue.draw(canvas);
+
+    	// Draw touchboxes if needed
+    	if(gameRunning() && mRed.player && mCurrentState == State.Running)
+        	mRed.drawTouchbox(canvas);
         
-        if(gameRunning() && mRedIsPlayer && mCurrentState == State.Running)
-        	canvas.drawLine(mRedTouchBox.left, mRedTouchBox.bottom, mRedTouchBox.right, mRedTouchBox.bottom, mPaint);
-    
-        // Draw Blue's stuff
-        mPaint.setColor(Color.BLUE);
-        canvas.drawRect(mBluePaddleRect, mPaint);
-        
-        if(gameRunning() && mBlueIsPlayer && mCurrentState == State.Running)
-        	canvas.drawLine(mBlueTouchBox.left, mBlueTouchBox.top, mBlueTouchBox.right, mBlueTouchBox.top, mPaint);
+        if(gameRunning() && mBlue.player && mCurrentState == State.Running)
+        	mBlue.drawTouchbox(canvas);
         
         // Draw ball stuff
         mPaint.setStyle(Style.FILL);
@@ -529,14 +462,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         	String join = context.getString(R.string.join_in);
         	int joinw = (int) mPaint.measureText(join);
         	
-        	if(!mRedIsPlayer) {
+        	if(!mRed.player) {
         		mPaint.setColor(Color.RED);
-        		canvas.drawText(join, getWidth() / 2 - joinw / 2, mRedTouchBox.centerY(), mPaint);
+        		canvas.drawText(join, getWidth() / 2 - joinw / 2, mRed.touchCenterY(), mPaint);
         	}
         	
-        	if(!mBlueIsPlayer) {
+        	if(!mBlue.player) {
         		mPaint.setColor(Color.BLUE);
-        		canvas.drawText(join, getWidth() / 2 - joinw / 2, mBlueTouchBox.centerY(), mPaint);
+        		canvas.drawText(join, getWidth() / 2 - joinw / 2, mBlue.touchCenterY(), mPaint);
         	}
         }
         
@@ -564,14 +497,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         if(!mShowTitle) {
         	mPaint.setColor(Color.WHITE);
         	mPaint.setStyle(Style.FILL_AND_STROKE);
-        	for(int i = 0; i < mRedLives; i++) {
+        	for(int i = 0; i < mRed.getLives(); i++) {
         		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
         				PADDING + Ball.RADIUS,
         				Ball.RADIUS,
         				mPaint);
         	}
         	
-        	for(int i = 0; i < mBlueLives; i++) {
+        	for(int i = 0; i < mBlue.getLives(); i++) {
         		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
         				getHeight() - PADDING - Ball.RADIUS,
         				Ball.RADIUS,
@@ -584,11 +517,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         	mPaint.setColor(Color.GREEN);
         	String s = "You both lose";
         	
-        	if(mBlueLives == 0) {
+        	if(!mBlue.living()) {
         		s = context.getString(R.string.red_wins);
         		mPaint.setColor(Color.RED);
         	}
-        	else if(mRedLives == 0) {
+        	else if(!mRed.living()) {
         		s = context.getString(R.string.blue_wins);
         		mPaint.setColor(Color.BLUE);
         	}
@@ -634,11 +567,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			
 			// Bottom paddle moves when we are playing in one or two player mode and the touch
 			// was in the lower quartile of the screen.
-			if(mBlueIsPlayer && mBlueTouchBox.contains(tx,ty)) {
-				mBlueLastTouch = tx;
+			if(mBlue.player && mBlue.inTouchbox(tx,ty)) {
+				mBlue.destination = tx;
 			}
-			else if(mRedIsPlayer && mRedTouchBox.contains(tx,ty)) {
-				mRedLastTouch = tx;
+			else if(mRed.player && mRed.inTouchbox(tx,ty)) {
+				mRed.destination = tx;
 			}
 			else if(mo.getAction() == MotionEvent.ACTION_DOWN && mPauseTouchBox.contains(tx, ty)) {
 				if(mCurrentState != State.Stopped) {
@@ -653,11 +586,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			
 			// In case a player wants to join in...
 			if(mo.getAction() == MotionEvent.ACTION_DOWN) {
-				if(!mBlueIsPlayer && mBlueTouchBox.contains(tx,ty)) {
-					mBlueIsPlayer = true;
+				if(!mBlue.player && mBlue.inTouchbox(tx,ty)) {
+					mBlue.player = true;
 				}
-				else if(!mRedIsPlayer && mRedTouchBox.contains(tx,ty)) {
-					mRedIsPlayer = true;
+				else if(!mRed.player && mRed.inTouchbox(tx,ty)) {
+					mRed.player = true;
 				}
 			}
 		}
@@ -669,14 +602,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	public boolean onTrackballEvent(MotionEvent event) {
 		if(!gameRunning() || mShowTitle) return false;
 		
-		if(mBlueIsPlayer == false) {
-			mBlueIsPlayer = true;
-			mBlueLastTouch = mBluePaddleRect.centerX();
+		if(mBlue.player == false) {
+			mBlue.player = true;
+			mBlue.destination = mBlue.centerX();
 		}
 		
 		switch(event.getAction()) {
 		case MotionEvent.ACTION_MOVE:
-			mBlueLastTouch = Math.max(0, Math.min(getWidth(), mBlueLastTouch + SCROLL_SENSITIVITY * event.getX()));
+			mBlue.destination = (int) Math.max(0, Math.min(getWidth(), mBlue.destination + SCROLL_SENSITIVITY * event.getX()));
 			break;
 		}
 		
@@ -687,12 +620,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Reset the lives, paddles and the like for a new game.
 	 */
 	public void newGame() {
-		mRedLives = 3;
-		mBlueLives = 3;
-		
-		resetPaddles();
 		nextRound();
-		
 		resumeLastState();
 	}
 	
@@ -713,7 +641,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 	
 	public boolean gameRunning() {
-		return mShowTitle || (mRedLives > 0 && mBlueLives > 0);
+		return mShowTitle || (mRed.living() && mBlue.living());
 	}
 	
 	public void setShowTitle(boolean b) {
@@ -737,8 +665,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 
 	public void setPlayerControl(boolean red, boolean blue) {
-		mRedIsPlayer = red;
-		mBlueIsPlayer = blue;
+		mRed.player = red;
+		mBlue.player = blue;
 	}
 
 	public void onCompletion(MediaPlayer mp) {
@@ -887,16 +815,15 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * @param r, the rectangle
 		 * @return true if the ball is colliding, false if not
 		 */
-		public boolean collides(Rect r) {
-			return 	x >= r.left && x <= r.right && 
-				y >= r.top - RADIUS && y <= r.bottom + RADIUS; 
+		public boolean collides(Paddle p) {
+			return p.collides(this); 
 		}
 		
 		/**
 		 * Method bounces the ball across a vertical axis. Seriously it's that easy.
 		 * Math failed me when figuring this out so I guessed instead.
 		 */
-		public void bouncePaddle(Rect r) {
+		public void bouncePaddle(Paddle p) {
 			double angle;
 			
 			// up-right case
@@ -909,8 +836,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			}
 			
 			angle %= (2 * Math.PI);
-			angle = salt(angle, r);
-			normalize(r);
+			angle = salt(angle, p);
+			normalize(p);
 			setAngle(angle);
 		}
 
@@ -921,9 +848,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			setAngle(3 * Math.PI - mAngle);
 		}
 		
-		protected double salt(double angle, Rect paddle) {
+		protected double salt(double angle, Paddle paddle) {
 			int cx = paddle.centerX();
-			double halfWidth = paddle.width() / 2;
+			double halfWidth = paddle.getWidth() / 2;
 			double change = 0.0;
 			
 			if(goingUp()) change = SALT * ((cx - x) / halfWidth);
@@ -936,18 +863,18 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		 * Normalizes a ball's position after it has hit a paddle.
 		 * @param r The paddle the ball has hit.
 		 */
-		protected void normalize(Rect r) {
+		protected void normalize(Paddle p) {
 			// Quit if the ball is outside the width of the paddle
-			if(x < r.left || x > r.right) {
+			if(x < p.getLeft() || x > p.getRight()) {
 				return;
 			}
 			
 			// Case if ball is above the paddle
-			if(y < r.top) {
-				y = Math.min(y, r.top - Ball.RADIUS);
+			if(y < p.getTop()) {
+				y = Math.min(y, p.getTop() - Ball.RADIUS);
 			}
-			else if(y > r.bottom) {
-				y = Math.max(y, r.bottom + Ball.RADIUS);
+			else if(y > p.getBottom()) {
+				y = Math.max(y, p.getBottom() + Ball.RADIUS);
 			}
 		}
 		
@@ -995,5 +922,129 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		public static final float SPEED = 4.0f; 
 		public static final int RADIUS = 4;
 		public static final double SALT = 4 * Math.PI / 9;
+	}
+
+	class Paddle {
+		protected int mColor;
+		protected Rect mRect;
+		protected Rect mTouch;
+		protected int mHandicap = 0;
+		protected int mSpeed = 4;
+		protected int mLives = 3;
+		
+		public boolean player = false;
+
+		public int destination;
+		
+		public Paddle(int c, int y) {
+			mColor = c;
+			
+			int mid = PongView.this.getWidth() / 2;
+			mRect = new Rect(mid - PADDLE_WIDTH / 2, y,
+					mid + PADDLE_WIDTH / 2, y + PADDLE_THICKNESS);
+			destination = mid;
+		}
+		
+		public void move() {
+			move(mSpeed);
+		}
+		
+		public void move(boolean handicapped) {
+			move((handicapped) ? mSpeed - mHandicap : mSpeed);
+		}
+		
+		public void move(int s) {
+			int dx = (int) Math.abs(mRect.centerX() - destination);
+			
+			if(destination < mRect.centerX()) {
+				mRect.offset( (dx > s) ? -s : -dx, 0);
+			}
+			else if(destination > mRect.centerX()) {
+				mRect.offset( (dx > mSpeed) ? mSpeed : dx, 0);
+			}
+		}
+		
+		public void setTouchbox(Rect r) {
+			mTouch = r;
+		}
+		
+		public void setSpeed(int s) {
+			mSpeed = (s > 0) ? s : mSpeed;
+		}
+		
+		public void setHandicap(int h) {
+			mHandicap = (h >= 0 && h < mSpeed) ? h : mHandicap; 
+		}
+		
+		public boolean inTouchbox(int x, int y) {
+			return mTouch.contains(x, y);
+		}
+		
+		public void loseLife() {
+			mLives = Math.max(0, mLives - 1);
+		}
+		
+		public boolean living() {
+			return mLives > 0;
+		}
+		
+		public int getWidth() {
+			return Paddle.PADDLE_WIDTH;
+		}
+		
+		public int getTop() {
+			return mRect.top;
+		}
+		
+		public int getBottom() {
+			return mRect.bottom;
+		}
+		
+		public int centerX() {
+			return mRect.centerX();
+		}
+		
+		public int centerY() {
+			return mRect.centerY();
+		}
+		
+		public int getLeft() {
+			return mRect.left;
+		}
+		
+		public int getRight() {
+			return mRect.right;
+		}
+		
+		public int touchCenterY() {
+			return mTouch.centerY();
+		}
+		
+		public int getLives() {
+			return mLives;
+		}
+		
+		public void draw(Canvas canvas) {
+			mPaint.setColor(mColor);
+			mPaint.setStyle(Style.FILL);
+			canvas.drawRect(mRect, mPaint);
+		}
+		
+		public void drawTouchbox(Canvas canvas) {
+			mPaint.setColor(mColor);
+			mPaint.setStyle(Style.STROKE);
+			canvas.drawRect(mTouch, mPaint);
+		}
+		
+		public boolean collides(Ball b) {
+			return b.x >= mRect.left && b.x <= mRect.right && 
+			b.y >= mRect.top - Ball.RADIUS && b.y <= mRect.bottom + Ball.RADIUS;
+		}
+		
+		/** Thickness of the paddle */
+		private static final int PADDLE_THICKNESS = 10;
+		
+		/** Width of the paddle */
+		private static final int PADDLE_WIDTH = 40;
 	}
 }
