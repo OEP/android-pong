@@ -196,12 +196,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * Given some initial game state, it computes the next game state.
      */
 	private void doGameLogic() {
+		float px = mBall.x;
 		float py = mBall.y;
 		
 		mBall.move();
 		
 		// Shake it up if it appears to not be moving vertically
-		if(py == mBall.y) {
+		if(py == mBall.y && mBall.serving() == false) {
 			mBall.randomAngle();
 		}
 		
@@ -211,6 +212,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		if(!mBlue.player) doAI(mBlue, mRed);
 		else mBlue.move();
+		
+		handleBounces(px,py);
 		
 		// See if all is lost
 		if(mBall.y >= getHeight()) {
@@ -226,11 +229,32 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			if(mRed.living() || mShowTitle) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
-		
-		handleBounces();
 	}
 	
-	protected void handleBounces() {
+	protected void handleBounces(float px, float py) {
+		/*// Bouncing off the paddles
+		if(mBall.goingUp() && mBall.collides(mRed) ) {
+			mBall.bouncePaddle(mRed);
+			playSound(mPaddleHit);
+			increaseDifficulty();
+		}
+		// At some point, the ball passed through this paddle.
+		else if(mBall.goingUp() && topy < mRed.getBottom() && ptopy > mRed.getBottom()
+				&& xrc > mRed.getLeft() && xrc < mRed.getRight()) {
+			mBall.x = xrc;
+			mBall.y = mRed.getBottom();
+			mBall.bouncePaddle(mRed);
+			increaseDifficulty();
+		}
+		else if(mBall.goingDown() && mBall.collides(mBlue)) {
+			mBall.bouncePaddle(mBlue);
+			playSound(mPaddleHit);
+			increaseDifficulty();
+		}*/
+		
+		handleTopFastBounce(mRed, px, py);
+		handleBottomFastBounce(mBlue, px, py);
+		
 		// Handle bouncing off of a wall
 		if(mBall.x <= Ball.RADIUS || mBall.x >= getWidth() - Ball.RADIUS) {
 			mBall.bounceWall();
@@ -241,17 +265,48 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 				mBall.x--;
 		}
 		
-		// Bouncing off the paddles
-		if(mBall.goingUp() && mBall.collides(mRed) ) {
-			mBall.bouncePaddle(mRed);
+	}
+	
+	protected void handleTopFastBounce(Paddle paddle, float px, float py) {
+		if(mBall.goingUp() == false) return;
+		
+		float tx = mBall.x;
+		float ty = mBall.y - Ball.RADIUS;
+		float ptx = px;
+		float pty = py - Ball.RADIUS;
+		float dyp = ty - paddle.getBottom();
+		float xc = tx + (tx - ptx) * dyp / (ty - pty);
+		
+		if(ty < paddle.getBottom() && pty > paddle.getBottom()
+				&& xc > paddle.getLeft() && xc < paddle.getRight()) {
+			
+			mBall.x = xc;
+			mBall.y = paddle.getBottom() + Ball.RADIUS;
+			mBall.bouncePaddle(paddle);
 			playSound(mPaddleHit);
 			increaseDifficulty();
 		}
-		else if(mBall.goingDown() && mBall.collides(mBlue)) {
-			mBall.bouncePaddle(mBlue);
+	}
+	
+	protected void handleBottomFastBounce(Paddle paddle, float px, float py) {
+		if(mBall.goingDown() == false) return;
+		
+		float bx = mBall.x;
+		float by = mBall.y + Ball.RADIUS;
+		float pbx = px;
+		float pby = py + Ball.RADIUS;
+		float dyp = by - paddle.getTop();
+		float xc = bx + (bx - pbx) * dyp / (pby - by);
+		
+		if(by > paddle.getTop() && pby < paddle.getTop()
+				&& xc > paddle.getLeft() && xc < paddle.getRight()) {
+			
+			mBall.x = xc;
+			mBall.y = paddle.getTop() - Ball.RADIUS;
+			mBall.bouncePaddle(paddle);
 			playSound(mPaddleHit);
 			increaseDifficulty();
-		}	
+		}
 	}
 	
 	/**
@@ -876,7 +931,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			
 			angle %= (2 * Math.PI);
 			angle = salt(angle, p);
-			normalize(p);
+//			normalize(p);
 			setAngle(angle);
 		}
 
