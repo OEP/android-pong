@@ -14,15 +14,16 @@
     <string name="quit">Quit</string>
     
     <string name="menu_prompt">Press Menu to start</string>
+    <string name="preferences">Preferences</string>
     
     <string name="new_game">New game</string>
     <string name="red_wins">A winner is Red!</string>
     <string name="blue_wins">A winner is Blue!</string>
     
     <string name="join_in">Touch to join in!</string>
-<string name="pause">Pause</string>
-<string name="toggle_sound">Toggle sound</string>
-
-<string name="sound_enabled">Sound enabled</string>
-<string name="sound_disabled">Sound disabled</string>
+	<string name="pause">Pause</string>
+	<string name="toggle_sound">Toggle sound</string>
+	
+	<string name="sound_enabled">Sound enabled</string>
+	<string name="sound_disabled">Sound disabled</string>
 </resources>

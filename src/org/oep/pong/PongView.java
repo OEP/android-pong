@@ -13,6 +13,7 @@ import android.graphics.Rect;
 import android.graphics.Paint.Style;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.AttributeSet;
@@ -42,8 +43,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		CPU_HANDICAP_HARD = 3,
 		CPU_HANDICAP_IMPOSSIBLE = 1;
 	
-	
-	
 	/**
 	 * This is mostly deprecated but kept around if the need
 	 * to add more game states comes around.
@@ -57,9 +56,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	
 	/** Starts a new round when set to true */
 	private boolean mNewRound = true;
-	
-	/** Shows the title screen when set to true */
-	private boolean mShowTitle = true;
 	
 	/** Keeps the game thread alive */
 	private boolean mContinue = true;
@@ -103,6 +99,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	
 	/** Tone for when a game is won */
 	private MediaPlayer mWinTone;
+	
+	/** Flags indicating who is a player */
+	private boolean mRedPlayer = false, mBluePlayer = false;
 
 	/**
 	 * An overloaded class that repaints this view in a separate thread.
@@ -153,8 +152,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	// Grab the muted preference
     	Context ctx = this.getContext();
-    	SharedPreferences settings = ctx.getSharedPreferences(Pong.DB_PREFS, 0);
-    	mMuted = settings.getBoolean(Pong.PREF_MUTED, mMuted);
+    	SharedPreferences settings = ctx.getSharedPreferences(GameActivity.DB_PREFS, 0);
+    	mMuted = settings.getBoolean(GameActivity.PREF_MUTED, mMuted);
     }
     
     /**
@@ -220,13 +219,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mNewRound = true;
 			mBlue.loseLife();
 			
-			if(mBlue.living() || mShowTitle) playSound(mMissTone);
+			if(mBlue.living()) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
 		else if (mBall.y <= 0) {
 			mNewRound = true;
 			mRed.loseLife();
-			if(mRed.living() || mShowTitle) playSound(mMissTone);
+			if(mRed.living()) playSound(mMissTone);
 			else playSound(mWinTone);
 		}
 	}
@@ -458,6 +457,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	mRed.setHandicap(CPU_HANDICAP_EASY);
     	mBlue.setHandicap(CPU_HANDICAP_EASY);
+    	
+    	mRed.player = mRedPlayer;
+    	mBlue.player = mBluePlayer;
     }
     
     /**
@@ -537,7 +539,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         
         // If either is a not a player, blink and let them know they can join in!
         // This blinks with the ball.
-        if(!mShowTitle && mBall.serving()) {
+        if(mBall.serving()) {
         	String join = context.getString(R.string.join_in);
         	int joinw = (int) mPaint.measureText(join);
         	
@@ -553,7 +555,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         }
         
         // Show where the player can touch to pause the game
-        if(!mShowTitle && mBall.serving()) {
+        if(mBall.serving()) {
         	String pause = context.getString(R.string.pause);
         	int pausew = (int) mPaint.measureText(pause);
         
@@ -573,23 +575,21 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         }
         
         // Draw a 'lives' counter
-        if(!mShowTitle) {
-        	mPaint.setColor(Color.WHITE);
-        	mPaint.setStyle(Style.FILL_AND_STROKE);
-        	for(int i = 0; i < mRed.getLives(); i++) {
-        		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
-        				PADDING + Ball.RADIUS,
-        				Ball.RADIUS,
-        				mPaint);
-        	}
-        	
-        	for(int i = 0; i < mBlue.getLives(); i++) {
-        		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
-        				getHeight() - PADDING - Ball.RADIUS,
-        				Ball.RADIUS,
-        				mPaint);
-        	}
-        }
+    	mPaint.setColor(Color.WHITE);
+    	mPaint.setStyle(Style.FILL_AND_STROKE);
+    	for(int i = 0; i < mRed.getLives(); i++) {
+    		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
+    				PADDING + Ball.RADIUS,
+    				Ball.RADIUS,
+    				mPaint);
+    	}
+    	
+    	for(int i = 0; i < mBlue.getLives(); i++) {
+    		canvas.drawCircle(Ball.RADIUS + PADDING + i * (2 * Ball.RADIUS + PADDING),
+    				getHeight() - PADDING - Ball.RADIUS,
+    				Ball.RADIUS,
+    				mPaint);
+    	}
         
         // Announce the winner!
         if(!gameRunning()) {
@@ -608,23 +608,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
         	int width = (int) mPaint.measureText(s);
         	int height = (int) (mPaint.ascent() + mPaint.descent()); 
         	canvas.drawText(s, getWidth() / 2 - width / 2, getHeight() / 2 - height / 2, mPaint);
-        }
-        
-        // Draw the Title text
-        if(mShowTitle) {
-        	Bitmap image = BitmapFactory.decodeResource(context.getResources(), R.drawable.pong);
-        	
-        	canvas.drawBitmap(image, getWidth() / 2 - image.getWidth() / 2, 
-        			getHeight() / 2 - image.getHeight() / 2, mPaint);
-        	
-        	String prompt = context.getString(R.string.menu_prompt);
-       	
-        	mPaint.setColor(Color.WHITE);
-        	
-        	int nextLine = 3 * getHeight() / 4;
-        	int w = (int) mPaint.measureText(prompt);
-        	canvas.drawText(prompt, getWidth() / 2 - w / 2, nextLine, mPaint);
-        }
+        }        
     }
 
     /**
@@ -633,7 +617,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
      * game.
      */
 	public boolean onTouch(View v, MotionEvent mo) {
-		if(v != this || !gameRunning() || mShowTitle) return false;
+		if(v != this || !gameRunning()) return false;
 		
 		// We want to support multiple touch and single touch
 		InputHandler handle = InputHandler.getInstance();
@@ -679,7 +663,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	
 	@Override
 	public boolean onTrackballEvent(MotionEvent event) {
-		if(!gameRunning() || mShowTitle) return false;
+		if(!gameRunning()) return false;
 		
 		if(mBlue.player == false) {
 			mBlue.player = true;
@@ -734,33 +718,21 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 	
 	public boolean gameRunning() {
-		return mShowTitle || (mRed.living() && mBlue.living());
-	}
-	
-	public void setShowTitle(boolean b) {
-		mShowTitle = b;
+		return (mRed.living() && mBlue.living());
 	}
 	
 	public void pause() {
-		if(!mShowTitle) {
-			mLastState = mCurrentState;
-			mCurrentState = State.Stopped;
-		}
+		mLastState = mCurrentState;
+		mCurrentState = State.Stopped;
 	}
 	
-	public boolean titleShowing() {
-		return mShowTitle;
-	}
-
-
 	public boolean onKey(View v, int keyCode, KeyEvent event) {
 		return false;
 	}
 
 	public void setPlayerControl(boolean red, boolean blue) {
-		mRed.player = red;
-		mBlue.player = blue;
-		newGame();
+		mRedPlayer = red;
+		mBluePlayer = blue;
 	}
 
 	public void onCompletion(MediaPlayer mp) {
@@ -786,11 +758,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Grab a preference editor
 		Context ctx = this.getContext();
-		SharedPreferences settings = ctx.getSharedPreferences(Pong.DB_PREFS, 0);
+		SharedPreferences settings = ctx.getSharedPreferences(GameActivity.DB_PREFS, 0);
 		SharedPreferences.Editor editor = settings.edit();
 		
 		// Save the value
-		editor.putBoolean(Pong.PREF_MUTED, b);
+		editor.putBoolean(GameActivity.PREF_MUTED, b);
 		editor.commit();
 		
 		// Output a toast to the user
@@ -802,6 +774,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	 * Put yer resources in year and we'll release em!
 	 */
 	public void releaseResources() {
+		mMuted = true;
 		mWallHit.release();
 		mPaddleHit.release();
 		mWinTone.release();
@@ -1135,7 +1108,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		public void drawTouchbox(Canvas canvas) {
 			mPaint.setColor(mColor);
 			mPaint.setStyle(Style.STROKE);
-			canvas.drawRect(mTouch, mPaint);
+			
+			// Heuristic for deciding which line to paint:
+			// draw the one closest to middle
+			int mid = getHeight() / 2;
+			int top = Math.abs(mTouch.top - mid), bot = Math.abs(mTouch.bottom - mid);
+			float y = (top < bot) ? mTouch.top : mTouch.bottom;
+			canvas.drawLine(mTouch.left, y, mTouch.right, y, mPaint);
 		}
 		
 		public boolean collides(Ball b) {
