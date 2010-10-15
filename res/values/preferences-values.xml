@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string-array name="label_ai_strategies">
+		<item>Prediction</item>
+	</string-array>
+	
+	<integer-array name="values_ai_strategies">
+		<item>0</item>
+	</integer-array>
+	
+	<string name="label_gameplay">Gameplay</string>
+	<string name="label_ai_strategy">AI Strategy</string>
+	<string name="label_ball_speed">Ball speed</string>
+	
+	<string name="summary_ai_strategy">Pick how the AI will decide where to move</string>
+	<string name="summary_ball_speed">Starting speed for the ball</string>
+	
+	<string name="key_ai_strategy">ai-strategy</string>
+	<string name="key_ball_speed">ball-speed</string>
+</resources>

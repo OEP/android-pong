@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 
@@ -21,6 +22,16 @@ public class Pong extends Activity {
 		MenuInflater inflater = getMenuInflater();
 		inflater.inflate(R.menu.game_menu, menu);
 		return true;
+	}
+	
+	public boolean onOptionsItemSelected(MenuItem item) {
+		switch(item.getItemId()) {
+		case R.id.menu_preferences:
+			Intent i = new Intent(this, PongPreferencesActivity.class);
+			startActivity(i);
+			break;
+		}
+		return false;
 	}
 	
 	
