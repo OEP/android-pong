@@ -1,17 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string-array name="label_ai_strategies">
+	<!-- Regionalized names for AI strategy -->
+	<string-array name="labels_ai_strategies">
 		<item>Prediction</item>
+		<item>Exact</item>
+		<item>Follow</item>
 	</string-array>
 	
-	<integer-array name="values_ai_strategies">
-		<item>0</item>
-	</integer-array>
+	<!-- Don't change these during regionalization -->
+	<string-array name="values_ai_strategies">
+		<item>PREDI</item>
+		<item>EXACT</item>
+		<item>FOLLO</item>
+	</string-array>
 	
+	<string name="label_sound">Sound</string>
 	<string name="label_gameplay">Gameplay</string>
+	<string name="label_muted">Muted</string>
 	<string name="label_ai_strategy">AI Strategy</string>
 	<string name="label_ball_speed">Ball speed</string>
+	<string name="label_lives">Paddle lives</string>
+	<string name="label_cpu_handicap">AI handicap</string>
 	
 	<string name="summary_ai_strategy">Pick how the AI will decide where to move</string>
 	<string name="summary_ball_speed">Starting speed for the ball</string>
+	<string name="summary_lives">Starting number of lives</string>
+	<string name="summary_cpu_handicap">Pick how much slower the AI is to the player</string>
 </resources>

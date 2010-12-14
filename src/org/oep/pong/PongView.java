@@ -39,12 +39,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	protected static final int FPS = 30;
 	
 	public static final int
-		STARTING_LIVES = 3,
-		PLAYER_PADDLE_SPEED = 10,
-		CPU_HANDICAP_EASY = 7,
-		CPU_HANDICAP_MED = 5,
-		CPU_HANDICAP_HARD = 3,
-		CPU_HANDICAP_IMPOSSIBLE = 1;
+		STARTING_LIVES = 1,
+		PLAYER_PADDLE_SPEED = 10;
 	
 	/**
 	 * This is mostly deprecated but kept around if the need
@@ -57,12 +53,17 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Flag that marks this view as initialized */
 	private boolean mInitialized = false;
 	
-	/** Our preferences store */
-	private SharedPreferences mPreferences;
-	
 	/** Preferences loaded at startup */
-	private int prefBallSpeed;
+	private int mBallSpeedModifier;
+	
+	/** Lives modifier */
+	private int mLivesModifier;
 		
+	/** AI Strategy */
+	private int mAiStrategy;
+	
+	/** CPU handicap */
+	private int mCpuHandicap;
 	
 	/** Starts a new round when set to true */
 	private boolean mNewRound = true;
@@ -160,11 +161,30 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	mMissTone = loadSound(R.raw.ballmiss);
     	mWinTone = loadSound(R.raw.wintone);
     	
-    	// Grab the muted preference
     	Context ctx = this.getContext();
-    	mPreferences = PreferenceManager.getDefaultSharedPreferences(ctx);
-    	prefBallSpeed = Math.max(0, mPreferences.getInt(Pong.PREF_BALL_SPEED, 0));
-    	mMuted = mPreferences.getBoolean(Pong.PREF_MUTED, mMuted);
+    	loadPreferences( PreferenceManager.getDefaultSharedPreferences(ctx) );
+    }
+    
+    protected void loadPreferences(SharedPreferences prefs) {
+    	Context ctx = getContext();
+    	Resources r = ctx.getResources();
+    	
+    	mBallSpeedModifier = Math.max(0, prefs.getInt(Pong.PREF_BALL_SPEED, 0));
+    	mMuted = prefs.getBoolean(Pong.PREF_MUTED, mMuted);
+    	mLivesModifier = Math.max(0, prefs.getInt(Pong.PREF_LIVES, 2));
+    	mCpuHandicap = Math.max(0, Math.min(PLAYER_PADDLE_SPEED-1, prefs.getInt(Pong.PREF_HANDICAP, 4)));
+    	
+    	String strategy = prefs.getString(Pong.PREF_STRATEGY, null);
+    	String strategies[] = r.getStringArray(R.array.values_ai_strategies);
+    	
+    	mAiStrategy = 0;
+    	// Linear-search the array for the appropriate strategy index =/
+    	for(int i = 0; strategy != null && strategy.length() > 0 && i < strategies.length; i++) {
+    		if(strategy.equals(strategies[i])) {
+    			mAiStrategy = i;
+    			break;
+    		}
+    	}
     }
     
     /**
@@ -242,26 +262,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 	
 	protected void handleBounces(float px, float py) {
-		/*// Bouncing off the paddles
-		if(mBall.goingUp() && mBall.collides(mRed) ) {
-			mBall.bouncePaddle(mRed);
-			playSound(mPaddleHit);
-			increaseDifficulty();
-		}
-		// At some point, the ball passed through this paddle.
-		else if(mBall.goingUp() && topy < mRed.getBottom() && ptopy > mRed.getBottom()
-				&& xrc > mRed.getLeft() && xrc < mRed.getRight()) {
-			mBall.x = xrc;
-			mBall.y = mRed.getBottom();
-			mBall.bouncePaddle(mRed);
-			increaseDifficulty();
-		}
-		else if(mBall.goingDown() && mBall.collides(mBlue)) {
-			mBall.bouncePaddle(mBlue);
-			playSound(mPaddleHit);
-			increaseDifficulty();
-		}*/
-		
 		handleTopFastBounce(mRed, px, py);
 		handleBottomFastBounce(mBlue, px, py);
 		
@@ -319,19 +319,27 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 	}
 	
+	private void doAI(Paddle cpu, Paddle opponent) {
+		switch(mAiStrategy) {
+		case 2:	aiFollow(cpu); break;
+		case 1:	aiExact(cpu); break;
+		default: aiPrediction(cpu,opponent); break;
+		}
+	}
+	
 	/**
 	 * A generalized Pong AI player. Takes a Rect object and a Ball, computes where the ball will
 	 * be when ball.y == rect.y, and tries to move toward that x-coordinate. If the ball is moving
 	 * straight it will try to clip the ball with the edge of the paddle.
-	 * @param red
+	 * @param cpu
 	 */
-	private void doAI(Paddle red, Paddle blue) {
+	private void aiPrediction(Paddle cpu, Paddle opponent) {
 		Ball ball = new Ball(mBall);
 		
 		// Special case: move torward the center if the ball is blinking
 		if(mBall.serving()) {
-			red.destination = getWidth() / 2;
-			red.move(true);
+			cpu.destination = getWidth() / 2;
+			cpu.move(true);
 			return;
 		}
 		
@@ -339,16 +347,16 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		if(ball.vy == 0) return;
 		
 		// Y-Distance from ball to Rect 'cpu'
-		float cpuDist = Math.abs(ball.y - red.centerY());
+		float cpuDist = Math.abs(ball.y - cpu.centerY());
 		// Y-Distance to opponent.
-		float oppDist = Math.abs( ball.y - blue.centerY() );
+		float oppDist = Math.abs( ball.y - opponent.centerY() );
 		
 		// Distance between two paddles.
-		float paddleDistance = Math.abs(red.centerY() - blue.centerY());
+		float paddleDistance = Math.abs(cpu.centerY() - opponent.centerY());
 		
 		// Is the ball coming at us?
-		boolean coming = (red.centerY() < ball.y && ball.vy < 0)
-			|| (red.centerY() > ball.y && ball.vy > 0);
+		boolean coming = (cpu.centerY() < ball.y && ball.vy < 0)
+			|| (cpu.centerY() > ball.y && ball.vy > 0);
 		
 		// Total amount of x-distance the ball covers
 		float total = ((((coming) ? cpuDist : oppDist + paddleDistance)) / Math.abs(ball.vy)) * Math.abs( ball.vx );
@@ -367,52 +375,38 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		boolean left = (bounces % 2 == 0) ? !ball.goingLeft() : ball.goingLeft();
 		
-		red.destination = getWidth() / 2;
+		cpu.destination = getWidth() / 2;
 		
 		// Now we need to compute the final x. That's all that matters.
 		if(bounces == 0) {
-			red.destination = (int) (ball.x + total * Math.signum(ball.vx));
+			cpu.destination = (int) (ball.x + total * Math.signum(ball.vx));
 		}
 		else if(left) {
-			red.destination = (int) (Ball.RADIUS + remains);
+			cpu.destination = (int) (Ball.RADIUS + remains);
 		}
 		else { // The ball is going right...
-			red.destination = (int) ((Ball.RADIUS + playWidth) - remains);
+			cpu.destination = (int) ((Ball.RADIUS + playWidth) - remains);
 		}
-		
-		/*if(cpu == mBluePaddleRect) {
-			projx = (int) prediction;
-			projy = mBluePaddleRect.centerY();
-			
-			Log.d(TAG, "Distance to blue: " + oppDist);
-			Log.d(TAG, "Distance to red: " + cpuDist);
-			Log.d(TAG, "Distance from red to blue: " + paddleDistance);
-			
-			Log.d(TAG, String.format("Ball V: <%f, %f>\n", ball.vx, ball.vy));
-			Log.d(TAG, String.format("Ball P: <%f, %f>\n", ball.x, ball.y));
-			
-			Log.d(TAG, "Total x-dist: " + total);
-			Log.d(TAG, "Total wall-dist: " + wallDist);
-			Log.d(TAG, "Total playWidth: " + playWidth);
-			Log.d(TAG, "Total remains: " + remains);
-			
-			
-			Log.d(TAG, "Bounces: " + bounces);
-			
-			Log.d(TAG, "Prediction: " + prediction);
-			
-			System.currentTimeMillis();
-		}*/
 		
 		// Try to give it a little kick if vx = 0
 		int salt = (int) (System.currentTimeMillis() / 10000);
-		Random r = new Random((long) (red.centerY() + ball.vx + ball.vy + salt));
-		int width = red.getWidth();
-		red.destination = (int) bound(
-				red.destination + r.nextInt(2 * width - (width / 5)) - width + (width / 10),
+		Random r = new Random((long) (cpu.centerY() + ball.vx + ball.vy + salt));
+		int width = cpu.getWidth();
+		cpu.destination = (int) bound(
+				cpu.destination + r.nextInt(2 * width - (width / 5)) - width + (width / 10),
 				0, getWidth()
 		);
-		red.move(true);
+		cpu.move(true);
+	}
+	
+	private void aiExact(Paddle cpu) {
+		cpu.destination = (int) mBall.x;
+		cpu.setPosition(cpu.destination);
+	}
+	
+	private void aiFollow(Paddle cpu) {
+		cpu.destination = (int) mBall.x;
+		cpu.move(true);
 	}
 	
 	/**
@@ -466,11 +460,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	mRed.setTouchbox( redTouch );
     	mBlue.setTouchbox( blueTouch );
     	
-    	mRed.setHandicap(CPU_HANDICAP_EASY);
-    	mBlue.setHandicap(CPU_HANDICAP_EASY);
+    	mRed.setHandicap(mCpuHandicap);
+    	mBlue.setHandicap(mCpuHandicap);
     	
     	mRed.player = mRedPlayer;
     	mBlue.player = mBluePlayer;
+    	
+    	mRed.setLives(STARTING_LIVES + mLivesModifier);
+    	mBlue.setLives(STARTING_LIVES + mLivesModifier);
     }
     
     /**
@@ -479,7 +476,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     private void serveBall() {
     	mBall.x = getWidth() / 2;
     	mBall.y = getHeight() / 2;
-    	mBall.speed = Ball.SPEED + prefBallSpeed;
+    	mBall.speed = Ball.SPEED + mBallSpeedModifier;
     	mBall.randomAngle();
     	mBall.pause();
     }
@@ -874,7 +871,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		}
 		
 		public void randomAngle() {
-			setAngle( 2 * Math.PI * RNG.nextDouble() );
+			setAngle( Math.PI / 2 + RNG.nextInt(2) * Math.PI + Math.PI / 2 * RNG.nextGaussian() );
 		}
 		
 		public void setAngle(double angle) {

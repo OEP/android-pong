@@ -1,33 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
 	android:key="pong_main">
+	<PreferenceCategory android:title="@string/label_sound">
+		<CheckBoxPreference
+			android:key="muted"
+			android:title="@string/label_muted"
+			/>
+	</PreferenceCategory>
 	<PreferenceCategory android:title="@string/label_gameplay">
-		<ListPreference android:title="@string/label_ai_strategy"
-			android:summary="@string/summary_ai_strategy" android:key="ai_strategy"
-			android:defaultValue="0" android:entries="@array/label_ai_strategies"
+		<ListPreference
+			android:key="strategy"
+			android:title="@string/label_ai_strategy"
+			android:summary="@string/summary_ai_strategy"
+			android:entries="@array/labels_ai_strategies"
 			android:entryValues="@array/values_ai_strategies" />
+			
+		<com.hlidskialf.android.preference.SeekBarPreference
+			android:key="handicap" android:title="@string/label_cpu_handicap"
+			android:text="-%s" android:summary="@string/summary_cpu_handicap"
+			android:dialogMessage="@string/label_cpu_handicap"
+			android:defaultValue="0" android:max="7" />
 
 		<com.hlidskialf.android.preference.SeekBarPreference
 			android:key="ball_speed" android:title="@string/label_ball_speed"
 			android:text="+%s" android:summary="@string/summary_ball_speed"
 			android:dialogMessage="@string/label_ball_speed"
 			android:defaultValue="0" android:max="15" />
-	</PreferenceCategory>
-	<PreferenceCategory android:title="Second Category">
-		<EditTextPreference android:name="EditText Preference"
-			android:summary="This allows you to enter a string"
-			android:defaultValue="Nothing" android:title="Edit This Text"
-			android:key="editTextPref" />
-		<RingtonePreference android:name="Ringtone Preference"
-			android:summary="Select a ringtone" android:title="Ringtones"
-			android:key="ringtonePref" />
-		<PreferenceScreen android:key="SecondPrefScreen"
-			android:title="Second PreferenceScreen" android:summary="This is a second PreferenceScreen">
-			<EditTextPreference android:name="An other EditText Preference"
-				android:summary="This is a preference in the second PreferenceScreen"
-				android:title="Edit text" android:key="SecondEditTextPref" />
-		</PreferenceScreen>
-		<Preference android:title="Custom Preference"
-			android:summary="This works almost like a button" android:key="customPref" />
+			
+		<com.hlidskialf.android.preference.SeekBarPreference
+			android:key="lives" android:title="@string/label_lives"
+			android:text="+%s" android:summary="@string/summary_lives"
+			android:dialogMessage="@string/label_lives"
+			android:defaultValue="0" android:max="9" />
 	</PreferenceCategory>
 </PreferenceScreen>

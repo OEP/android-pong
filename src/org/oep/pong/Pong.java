@@ -71,5 +71,11 @@ public class Pong extends Activity {
 	
 	public static final String
 		PREF_BALL_SPEED = "ball_speed",
+		PREF_STRATEGY = "strategy",
+		PREF_LIVES = "lives",
+		PREF_HANDICAP = "handicap",
 		PREF_MUTED = "muted";
+	
+	public static final String
+		KEY_AI_STRATEGY = "key_ai_strategy";
 }
