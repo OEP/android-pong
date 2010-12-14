@@ -1,6 +1,8 @@
 /* The following code was written by Matthew Wiggins 
  * and is released under the APACHE 2.0 license 
  * 
+ * In part modified by Paul Kilgo.
+ * 
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 package com.hlidskialf.android.preference;
@@ -22,7 +24,7 @@ public class SeekBarPreference extends DialogPreference implements
 	private TextView mSplashText, mValueText;
 	private Context mContext;
 
-	private String mDialogMessage, mSuffix;
+	private String mDialogMessage, mFormat;
 	private int mDefault, mMax, mValue = 0;
 
 	public SeekBarPreference(Context context, AttributeSet attrs) {
@@ -30,10 +32,9 @@ public class SeekBarPreference extends DialogPreference implements
 		mContext = context;
 
 		mDialogMessage = attrs.getAttributeValue(androidns, "dialogMessage");
-		mSuffix = attrs.getAttributeValue(androidns, "text");
+		mFormat = attrs.getAttributeValue(androidns, "text");
 		mDefault = attrs.getAttributeIntValue(androidns, "defaultValue", 0);
 		mMax = attrs.getAttributeIntValue(androidns, "max", 100);
-
 	}
 
 	@Override
@@ -44,9 +45,10 @@ public class SeekBarPreference extends DialogPreference implements
 		layout.setPadding(6, 6, 6, 6);
 
 		mSplashText = new TextView(mContext);
-		if (mDialogMessage != null)
+		if (mDialogMessage != null && mDialogMessage.length() > 0) {
 			mSplashText.setText(mDialogMessage);
-		layout.addView(mSplashText);
+			layout.addView(mSplashText);
+		}
 
 		mValueText = new TextView(mContext);
 		mValueText.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -88,7 +90,7 @@ public class SeekBarPreference extends DialogPreference implements
 
 	public void onProgressChanged(SeekBar seek, int value, boolean fromTouch) {
 		String t = String.valueOf(value);
-		mValueText.setText(mSuffix == null ? t : t.concat(mSuffix));
+		mValueText.setText(mFormat == null ? t : String.format(mFormat, t));
 		if (shouldPersist())
 			persistInt(value);
 		callChangeListener(new Integer(value));
@@ -103,11 +105,11 @@ public class SeekBarPreference extends DialogPreference implements
 	public void setMax(int max) {
 		mMax = max;
 	}
-
+	
 	public int getMax() {
 		return mMax;
 	}
-
+	
 	public void setProgress(int progress) {
 		mValue = progress;
 		if (mSeekBar != null)

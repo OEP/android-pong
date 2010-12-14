@@ -14,7 +14,4 @@
 	
 	<string name="summary_ai_strategy">Pick how the AI will decide where to move</string>
 	<string name="summary_ball_speed">Starting speed for the ball</string>
-	
-	<string name="key_ai_strategy">ai-strategy</string>
-	<string name="key_ball_speed">ball-speed</string>
 </resources>

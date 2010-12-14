@@ -1,9 +1,11 @@
 package org.oep.pong;
 
 import java.util.Random;
+import java.util.prefs.Preferences;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -16,6 +18,7 @@ import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -53,6 +56,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 
 	/** Flag that marks this view as initialized */
 	private boolean mInitialized = false;
+	
+	/** Our preferences store */
+	private SharedPreferences mPreferences;
+	
+	/** Preferences loaded at startup */
+	private int prefBallSpeed;
+		
 	
 	/** Starts a new round when set to true */
 	private boolean mNewRound = true;
@@ -152,8 +162,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	
     	// Grab the muted preference
     	Context ctx = this.getContext();
-    	SharedPreferences settings = ctx.getSharedPreferences(GameActivity.DB_PREFS, 0);
-    	mMuted = settings.getBoolean(GameActivity.PREF_MUTED, mMuted);
+    	mPreferences = PreferenceManager.getDefaultSharedPreferences(ctx);
+    	prefBallSpeed = Math.max(0, mPreferences.getInt(Pong.PREF_BALL_SPEED, 0));
+    	mMuted = mPreferences.getBoolean(Pong.PREF_MUTED, mMuted);
     }
     
     /**
@@ -468,7 +479,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     private void serveBall() {
     	mBall.x = getWidth() / 2;
     	mBall.y = getHeight() / 2;
-    	mBall.speed = Ball.SPEED;
+    	mBall.speed = Ball.SPEED + prefBallSpeed;
     	mBall.randomAngle();
     	mBall.pause();
     }
@@ -758,11 +769,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		
 		// Grab a preference editor
 		Context ctx = this.getContext();
-		SharedPreferences settings = ctx.getSharedPreferences(GameActivity.DB_PREFS, 0);
+		SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(ctx);
 		SharedPreferences.Editor editor = settings.edit();
 		
 		// Save the value
-		editor.putBoolean(GameActivity.PREF_MUTED, b);
+		editor.putBoolean(Pong.PREF_MUTED, b);
 		editor.commit();
 		
 		// Output a toast to the user

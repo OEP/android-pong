@@ -68,4 +68,8 @@ public class Pong extends Activity {
 		startActivity(i);
 	}
 	
+	
+	public static final String
+		PREF_BALL_SPEED = "ball_speed",
+		PREF_MUTED = "muted";
 }

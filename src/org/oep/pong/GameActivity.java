@@ -67,7 +67,4 @@ public class GameActivity extends Activity {
     		mAboutBox = null;
     	}
     }
-    
-    public static final String DB_PREFS = "Pong";
-    public static final String PREF_MUTED = "pref_muted";
 }

@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	android:key="pong_main">
 	<PreferenceCategory android:title="@string/label_gameplay">
 		<ListPreference android:title="@string/label_ai_strategy"
-			android:summary="@string/summary_ai_strategy" android:key="@string/key_ai_strategy"
+			android:summary="@string/summary_ai_strategy" android:key="ai_strategy"
 			android:defaultValue="0" android:entries="@array/label_ai_strategies"
 			android:entryValues="@array/values_ai_strategies" />
 
 		<com.hlidskialf.android.preference.SeekBarPreference
-			android:key="@string/key_ball_speed"
-			android:title="@string/label_ball_speed"
-			android:summary="@string/summary_ball_speed"
+			android:key="ball_speed" android:title="@string/label_ball_speed"
+			android:text="+%s" android:summary="@string/summary_ball_speed"
 			android:dialogMessage="@string/label_ball_speed"
-			android:defaultValue="5"
-			android:text=" minutes"
-			android:max="60" />
+			android:defaultValue="0" android:max="15" />
 	</PreferenceCategory>
 	<PreferenceCategory android:title="Second Category">
 		<EditTextPreference android:name="EditText Preference"
