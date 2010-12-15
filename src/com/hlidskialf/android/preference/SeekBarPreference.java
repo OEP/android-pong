@@ -7,14 +7,11 @@
  */
 package com.hlidskialf.android.preference;
 
-import android.R;
-import android.app.Dialog;
 import android.content.Context;
 import android.preference.DialogPreference;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
