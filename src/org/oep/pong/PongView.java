@@ -31,6 +31,7 @@ import android.widget.Toast;
  */
 public class PongView extends View implements OnTouchListener, OnKeyListener, OnCompletionListener {
 	/** Debug tag */
+	@SuppressWarnings("unused")
 	private static final String TAG = "PongView";
 	protected static final int FPS = 30;
 	
@@ -722,7 +723,8 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 	
 	public boolean gameRunning() {
-		return (mRed.living() && mBlue.living());
+		return mInitialized && mRed != null && mBlue != null
+			&& mRed.living() && mBlue.living();
 	}
 	
 	public void pause() {
