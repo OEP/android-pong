@@ -1,18 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pong</string>
-    <string name="by_line">by Paul Kilgo</string>
     <string name="paused">P A U S E D</string>
     
     <string name="one_player">One player</string>
     <string name="two_players">Two players</string>
     <string name="no_players">No players</string>
-    <string name="about">About</string>
-    <string name="about_pong">About Pong</string>
-    <string name="about_msg">Pong by One-Eyed Parrot Games http://pk-fire.com/</string>
-    <string name="quit">Quit</string>
     
-    <string name="menu_prompt">Press Menu to start</string>
     <string name="preferences">Preferences</string>
     
     <string name="new_game">New game</string>
@@ -21,8 +15,4 @@
     
     <string name="join_in">Touch to join in!</string>
 	<string name="pause">Pause</string>
-	<string name="toggle_sound">Toggle sound</string>
-	
-	<string name="sound_enabled">Sound enabled</string>
-	<string name="sound_disabled">Sound disabled</string>
 </resources>

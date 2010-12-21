@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish preferences messages by Paul Kilgo -->
+<resources>
+	<!-- Regionalized names for AI strategy -->
+	<string-array name="labels_ai_strategies">
+		<item>Predicción</item>
+		<item>Exacto</item>
+		<item>Seguir</item>
+	</string-array>
+	
+	<string name="label_sound">Sonido</string>
+	<string name="label_gameplay">Juego</string>
+	<string name="label_muted">Callado</string>
+	<string name="label_ai_strategy">Estrategia de IA</string>
+	<string name="label_ball_speed">Velocidad de la pelota</string>
+	<string name="label_lives">Vidas de paleta</string>
+	<string name="label_cpu_handicap">Desventaja la IA</string>
+	
+	<string name="summary_ai_strategy">Elegir cómo la IA decide dónde se moverá.</string>
+	<string name="summary_ball_speed">Velocidad inicia de la pelota</string>
+	<string name="summary_lives">Numero inicio de vidas</string>
+	<string name="summary_cpu_handicap">Elegir cuánto más lento se mueve la IA</string>
+</resources>

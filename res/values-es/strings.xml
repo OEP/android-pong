@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish game messages translation by Paul Kilgo -->
+<resources>
+    <string name="app_name">Pong</string>
+    <string name="by_line">por Paul Kilgo</string>
+    <string name="paused">E N   P A U S A</string>
+    
+    <string name="one_player">Uno jugador</string>
+    <string name="two_players">Dos jugadores</string>
+    <string name="no_players">Sin jugadores</string>
+    
+    <string name="preferences">Preferencias</string>
+    
+    <string name="red_wins">¡Un ganador es Rojo!</string>
+    <string name="blue_wins">¡Un ganador es Azúl!</string>
+    
+    <string name="join_in">¡Toque para jugar!</string>
+	<string name="pause">Hacer pausa</string>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French game message translation by Nicolas François -->
+<resources>
+    <string name="app_name">Pong</string>
+    <string name="paused">E N  P A U S E</string>
+    
+    <string name="one_player">Un joueur</string>
+    <string name="two_players">Deux joueurs</string>
+    <string name="no_players">Aucun joueur</string>
+    
+    <string name="new_game">Nouveau jeu</string>
+    <string name="red_wins">Rouge gagne!</string>
+    <string name="blue_wins">Bleu gagne!</string>
+    
+    <string name="join_in">Touchez pour rejoindre!</string>
+	<string name="pause">Pause</string>
+</resources>
