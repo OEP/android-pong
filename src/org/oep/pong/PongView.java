@@ -11,8 +11,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Paint.Style;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
-import android.media.MediaPlayer.OnCompletionListener;
 import android.media.SoundPool;
 import android.os.Handler;
 import android.os.Message;
@@ -31,7 +29,7 @@ import android.widget.Toast;
  * @author OEP
  *
  */
-public class PongView extends View implements OnTouchListener, OnKeyListener, OnCompletionListener {
+public class PongView extends View implements OnTouchListener, OnKeyListener {
 	/** Debug tag */
 	@SuppressWarnings("unused")
 	private static final String TAG = "PongView";
@@ -740,10 +738,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		mBluePlayer = blue;
 	}
 
-	public void onCompletion(MediaPlayer mp) {
-		mp.release();
-	}
-	
 	public void resume() {
 		mContinue = true;
 		update();
