@@ -57,7 +57,7 @@ public class GameActivity extends Activity {
     
     protected void onDestroy() {
     	super.onDestroy();
-    	mPongView.releaseResources();
+    	mPongView.release();
     	mWakeLock.release();
     }
    

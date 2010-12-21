@@ -10,8 +10,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Paint.Style;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
+import android.media.SoundPool;
 import android.os.Handler;
 import android.os.Message;
 import android.preference.PreferenceManager;
@@ -84,6 +86,11 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	/** Random number generator */
 	private static final Random RNG = new Random();
 	
+	/** Pool for our sound effects */
+	protected SoundPool mPool = new SoundPool(3, AudioManager.STREAM_MUSIC, 0);
+	
+	protected int mWinSFX, mMissSFX, mPaddleSFX, mWallSFX;
+	
 	/** Paint object */
 	private final Paint mPaint = new Paint();
 
@@ -95,18 +102,6 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 
 	/** Redraws the screen according to FPS */
 	private RefreshHandler mRedrawHandler = new RefreshHandler();
-	
-	/** Tone for a wall hit */
-	private MediaPlayer mWallHit;
-	
-	/** Tone for a paddle hit */
-	private MediaPlayer mPaddleHit;
-	
-	/** Tone for when the ball is missed */
-	private MediaPlayer mMissTone;
-	
-	/** Tone for when a game is won */
-	private MediaPlayer mWinTone;
 	
 	/** Flags indicating who is a player */
 	private boolean mRedPlayer = false, mBluePlayer = false;
@@ -153,13 +148,17 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
     	setOnKeyListener(this);
     	setFocusable(true);
     	
-    	mWallHit = loadSound(R.raw.wall);
-    	mPaddleHit = loadSound(R.raw.paddle);
-    	mMissTone = loadSound(R.raw.ballmiss);
-    	mWinTone = loadSound(R.raw.wintone);
-    	
     	Context ctx = this.getContext();
     	loadPreferences( PreferenceManager.getDefaultSharedPreferences(ctx) );
+    	loadSFX();
+    }
+    
+    protected void loadSFX() {
+    	Context ctx = getContext();
+    	mWinSFX = mPool.load(ctx, R.raw.wintone, 1);
+    	mMissSFX = mPool.load(ctx, R.raw.ballmiss, 1);
+    	mPaddleSFX = mPool.load(ctx, R.raw.paddle, 1);
+    	mWallSFX = mPool.load(ctx, R.raw.wall, 1);
     }
     
     protected void loadPreferences(SharedPreferences prefs) {
@@ -247,14 +246,14 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mNewRound = true;
 			mBlue.loseLife();
 			
-			if(mBlue.living()) playSound(mMissTone);
-			else playSound(mWinTone);
+			if(mBlue.living()) playSound(mMissSFX);
+			else playSound(mWinSFX);
 		}
 		else if (mBall.y <= 0) {
 			mNewRound = true;
 			mRed.loseLife();
-			if(mRed.living()) playSound(mMissTone);
-			else playSound(mWinTone);
+			if(mRed.living()) playSound(mMissSFX);
+			else playSound(mWinSFX);
 		}
 	}
 	
@@ -265,7 +264,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		// Handle bouncing off of a wall
 		if(mBall.x <= Ball.RADIUS || mBall.x >= getWidth() - Ball.RADIUS) {
 			mBall.bounceWall();
-			playSound(mWallHit);
+			playSound(mWallSFX);
 			if(mBall.x == Ball.RADIUS)
 				mBall.x++;
 			else
@@ -290,7 +289,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mBall.x = xc;
 			mBall.y = paddle.getBottom() + Ball.RADIUS;
 			mBall.bouncePaddle(paddle);
-			playSound(mPaddleHit);
+			playSound(mPaddleSFX);
 			increaseDifficulty();
 		}
 	}
@@ -311,7 +310,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 			mBall.x = xc;
 			mBall.y = paddle.getTop() - Ball.RADIUS;
 			mBall.bouncePaddle(paddle);
-			playSound(mPaddleHit);
+			playSound(mPaddleSFX);
 			increaseDifficulty();
 		}
 	}
@@ -742,7 +741,7 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	}
 
 	public void onCompletion(MediaPlayer mp) {
-		mp.seekTo(0);
+		mp.release();
 	}
 	
 	public void resume() {
@@ -752,6 +751,13 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 	
 	public void stop() {
 		mContinue = false;
+	}
+	
+	/**
+	 * Release all resource locks.
+	 */
+	public void release() {
+		mPool.release();
 	}
 	
 	public void toggleMuted() {
@@ -776,30 +782,9 @@ public class PongView extends View implements OnTouchListener, OnKeyListener, On
 		Toast.makeText(ctx, rid, Toast.LENGTH_SHORT).show();
 	}
 	
-	/**
-	 * Put yer resources in year and we'll release em!
-	 */
-	public void releaseResources() {
-		mMuted = true;
-		mWallHit.release();
-		mPaddleHit.release();
-		mWinTone.release();
-		mMissTone.release();
-	}
-	
-	private MediaPlayer loadSound(int rid) {
-		MediaPlayer mp = MediaPlayer.create(getContext(), rid);
-		mp.setOnCompletionListener(this);
-		return mp;
-	}
-	
-	private void playSound(MediaPlayer mp) {
+	private void playSound(int rid) {
 		if(mMuted == true) return;
-		
-		if(!mp.isPlaying()) {
-			mp.setVolume(0.2f, 0.2f);
-			mp.start();
-		}
+		mPool.play(rid, 0.2f, 0.2f, 1, 0, 1.0f);
 	}
 	
 	class Ball {
